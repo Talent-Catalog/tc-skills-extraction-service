@@ -1,3 +1,11 @@
+POST http://localhost:8000/extract_skills
+Content-Type: application/json
+
+{
+  "text": "John is a Java programmer who knows Spring Boot a bit"
+}
+
+###
 # Test your FastAPI endpoints
 
 GET http://127.0.0.1:8000/

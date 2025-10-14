@@ -7,19 +7,19 @@ Dependencies:
 python -m pip install "fastapi[standard]"
 
 """
-import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, Request
 import spacy
 from spacy.matcher import PhraseMatcher
-from app.models import ExtractedSkills, TextToProcess
+from app.models import ExtractSkillsResponse, ExtractSkillsRequest
 from app.services.skills_extractor import SkillsExtractor
 
+
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app_: FastAPI):
   # Load heavy resources ONCE, without blocking the event loop.
   # asyncio.to_thread runs blocking calls in a threadpool.
-  nlp = await asyncio.to_thread(spacy.load, "en_core_web_sm")
+  nlp = spacy.load("en_core_web_sm")
 
   #Example: this should be populated from skills on our Postgres database
   # populated from ESCO.
@@ -39,27 +39,28 @@ async def lifespan(app: FastAPI):
   # See https://spacy.io/api/phrasematcher#add
   matcher.add("SKILL", patterns)
 
-  # The above matcher only needs to be created once at start up (20,000 skill
+  # The above matcher only needs to be created once at start-up (20,000 skill
   # names - so only want to do once).
 
-  app.state.extractor = SkillsExtractor(nlp=nlp, matcher=matcher) # type: ignore[attr-defined] (disable checking, state is there only at runtime)
+  app_.state.extractor = SkillsExtractor(nlp=nlp, matcher=matcher) # type: ignore[attr-defined] (disable checking, state is there only at runtime)
 
+  # Everything before the yield runs once at startup.
+  # FastAPI won't start listening on the port until the pre-yield code is done.
+  yield
+  # Everything from here runs once at shutdown.
 
-  try:
-    yield
-  finally:
-    # spaCy doesn't need an explicit teardown.
-    # If you opened sockets/files, close them here.
-    app.state.extractor = None # type: ignore[attr-defined] (disable checking, state is there only at runtime)
+  # spaCy doesn't need an explicit teardown.
+  # If you opened sockets/files, close them here.
+  app.state.extractor = None # type: ignore[attr-defined] (disable checking, state is there only at runtime)
 
-app = FastAPI(title="Text Processor API", lifespan=lifespan)
 
 def get_extractor(request: Request) -> SkillsExtractor:
   return request.app.state.extractor  # created once in lifespan()
 
+app = FastAPI(title="Skills Extractor API", lifespan=lifespan)
 
-@app.post("/extract_skills", response_model=ExtractedSkills)
-async def extract_skills(payload: TextToProcess,
+@app.post("/extract_skills", response_model=ExtractSkillsResponse)
+def extract_skills(payload: ExtractSkillsRequest,
     extractor: SkillsExtractor = Depends(get_extractor)):
   """
   Extract skills from the given text
@@ -68,5 +69,5 @@ async def extract_skills(payload: TextToProcess,
   :return: a List of extracted skills
   """
   result = extractor.extract_skills(payload.text)
-  return ExtractedSkills(skills=result)
+  return ExtractSkillsResponse(skills=result)
 

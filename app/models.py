@@ -1,8 +1,8 @@
 from typing import List
 from pydantic import BaseModel, Field
 
-class ExtractedSkills(BaseModel):
+class ExtractSkillsResponse(BaseModel):
   skills: List[str]
 
-class TextToProcess(BaseModel):
+class ExtractSkillsRequest(BaseModel):
   text: str = Field(..., description="The text to extract skills from")
