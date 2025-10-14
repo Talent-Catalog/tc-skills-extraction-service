@@ -9,11 +9,42 @@ python -m pip install "fastapi[standard]"
 """
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, Request
+from typing import List
 import spacy
 from spacy.matcher import PhraseMatcher
 from app.models import ExtractSkillsResponse, ExtractSkillsRequest
 from app.services.skills_extractor import SkillsExtractor
 
+def load_all_skills() -> List[str]:
+
+  #Example: this should be populated from skills on our Postgres database
+  # populated from ESCO.
+  # Could be around 20,000 of these
+  return [
+    "Java", "Spring Boot", "Python", "FastAPI", "Docker", "Kubernetes", "PostgreSQL",
+    "MapStruct", "Angular", "AWS", "Terraform", "Natural language processing","Spring"
+  ]
+
+def build_matcher(nlp: spacy.language.Language, skills: List[str]) -> PhraseMatcher:
+  """
+  The matcher only needs to be created once at start-up (20,000 skill
+  # names - so only want to do once)
+  :param nlp: Spacy model
+  :param skills: List of skills
+  :return: PhraseMatcher
+  """
+
+  # Convert text skills into an array of NLP docs.
+  patterns = [nlp.make_doc(s) for s in skills]
+
+  # Matching is case-insensitive - see https://spacy.io/api/phrasematcher#init
+  matcher = PhraseMatcher(nlp.vocab, attr="LOWER")
+
+  # Configure the matcher to recognize the skills as a special kind of match.
+  # See https://spacy.io/api/phrasematcher#add
+  matcher.add("SKILL", patterns)
+
+  return matcher
 
 @asynccontextmanager
 async def lifespan(app_: FastAPI):
@@ -21,28 +52,16 @@ async def lifespan(app_: FastAPI):
   # asyncio.to_thread runs blocking calls in a threadpool.
   nlp = spacy.load("en_core_web_sm")
 
-  #Example: this should be populated from skills on our Postgres database
-  # populated from ESCO.
-  # Could be around 20,000 of these
-  esco_skill_labels = [
-    "Java", "Spring Boot", "Python", "FastAPI", "Docker", "Kubernetes", "PostgreSQL",
-    "MapStruct", "Angular", "AWS", "Terraform", "Natural language processing","Spring"
-  ]
+  # This can take a while. Skills are retrieved from an external service and
+  # there could be around 20,000 of them.
+  esco_skill_labels = load_all_skills()
 
-  # Matching is case-insensitive - see https://spacy.io/api/phrasematcher#init
-  matcher = PhraseMatcher(nlp.vocab, attr="LOWER")
+  # Build matcher once at startup. All skills have to be added to the matcher.
+  matcher = build_matcher(nlp, esco_skill_labels)
 
-  # Convert text skills into an array of NLP docs.
-  patterns = [nlp.make_doc(s) for s in esco_skill_labels]
-
-  # Configure the matcher to recognize the skills as a special kind of match.
-  # See https://spacy.io/api/phrasematcher#add
-  matcher.add("SKILL", patterns)
-
-  # The above matcher only needs to be created once at start-up (20,000 skill
-  # names - so only want to do once).
-
+  # The extractor is configured with all the heavy resources.
   app_.state.extractor = SkillsExtractor(nlp=nlp, matcher=matcher) # type: ignore[attr-defined] (disable checking, state is there only at runtime)
+  app_.state.ready = True # type: ignore[attr-defined] (disable checking, state is there only at runtime)
 
   # Everything before the yield runs once at startup.
   # FastAPI won't start listening on the port until the pre-yield code is done.
@@ -60,8 +79,9 @@ def get_extractor(request: Request) -> SkillsExtractor:
 app = FastAPI(title="Skills Extractor API", lifespan=lifespan)
 
 @app.post("/extract_skills", response_model=ExtractSkillsResponse)
-def extract_skills(payload: ExtractSkillsRequest,
-    extractor: SkillsExtractor = Depends(get_extractor)):
+def extract_skills(
+    payload: ExtractSkillsRequest,
+    extractor: SkillsExtractor = Depends(get_extractor)) -> ExtractSkillsResponse:
   """
   Extract skills from the given text
   :param payload: the text to extract skills from
@@ -71,3 +91,12 @@ def extract_skills(payload: ExtractSkillsRequest,
   result = extractor.extract_skills(payload.text)
   return ExtractSkillsResponse(skills=result)
 
+@app.get("/readyz")
+def readyz(request: Request):
+  """
+  This is a commonly used liveness check endpoint.
+  :param request: contains the app instance where the state is stored
+  :return: a JSON response with the ready status
+  """
+  ready = bool(getattr(request.app.state, "ready", False))
+  return {"ready": ready}

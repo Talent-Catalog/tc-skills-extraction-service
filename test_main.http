@@ -1,3 +1,5 @@
+# Test FastAPI endpoints
+
 POST http://localhost:8000/extract_skills
 Content-Type: application/json
 
@@ -6,14 +8,8 @@ Content-Type: application/json
 }
 
 ###
-# Test your FastAPI endpoints
 
-GET http://127.0.0.1:8000/
-Accept: application/json
-
-###
-
-GET http://127.0.0.1:8000/hello/User
+GET http://127.0.0.1:8000/readyz
 Accept: application/json
 
 ###
