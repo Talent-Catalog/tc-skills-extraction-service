@@ -17,6 +17,7 @@ from app.services.skills_extractor import SkillsExtractor
 
 def load_all_skills() -> List[str]:
 
+  # todo Replace with skills service
   #Example: this should be populated from skills on our Postgres database
   # populated from ESCO.
   # Could be around 20,000 of these
