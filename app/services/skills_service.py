@@ -1,24 +1,19 @@
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable
 import requests
 
 from typing import List
 
 class SkillsService:
   def __init__(self):
-    self.base_url = "http://localhost:8080"
+    self.base_url = "http://localhost:8080/api/public/skill/names"
 
   def get_skills(self) -> List[str]:
-    #Example: this should be populated from skills on our Postgres database
-    # populated from ESCO.
-    # Could be around 20,000 of these
     items = self.__load_all_items()
-    skills = List[str]()
+    skills = []
     for item in items:
-      skills.append(item["label"])
+      skills.append(item["name"])
 
     return skills
-    # return ["Java", "Spring Boot", "Python", "FastAPI", "Docker", "C++", "Kubernetes", "PostgreSQL",
-    #         "MapStruct", "Angular", "AWS", "Terraform", "Natural language processing","Spring"]
 
   def __load_all_items(self, size=100, token=None) -> Iterable[Dict]:
     """
