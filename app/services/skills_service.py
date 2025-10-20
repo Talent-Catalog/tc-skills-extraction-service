@@ -5,6 +5,7 @@ from typing import List
 
 class SkillsService:
   def __init__(self):
+    # todo This needs to be configurable
     self.base_url = "http://localhost:8080/api/public/skill/names"
 
   def get_skills(self) -> List[str]:
