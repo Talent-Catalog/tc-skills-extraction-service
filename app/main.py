@@ -14,16 +14,7 @@ import spacy
 from spacy.matcher import PhraseMatcher
 from app.models import ExtractSkillsResponse, ExtractSkillsRequest
 from app.services.skills_extractor import SkillsExtractor
-
-def load_all_skills() -> List[str]:
-
-  #Example: this should be populated from skills on our Postgres database
-  # populated from ESCO.
-  # Could be around 20,000 of these
-  return [
-    "Java", "Spring Boot", "Python", "FastAPI", "Docker", "C++", "Kubernetes", "PostgreSQL",
-    "MapStruct", "Angular", "AWS", "Terraform", "Natural language processing","Spring"
-  ]
+from app.services.skills_service import SkillsService
 
 def build_matcher(nlp: spacy.language.Language, skills: List[str]) -> PhraseMatcher:
   """
@@ -48,13 +39,25 @@ def build_matcher(nlp: spacy.language.Language, skills: List[str]) -> PhraseMatc
 
 @asynccontextmanager
 async def lifespan(app_: FastAPI):
+  """
+  This runs once at startup up to the yield statement.
+  :param app_: Reference to the FastAPI app
+
+  Sets up the app state including global services and resources which are
+  attached to the app instance through the app.state attribute which can
+  be accessed in other parts of the code through Request dependency injection.
+  Globals are accessible through Request.app.state - whose values are set
+  in this set-up function.
+  """
+
   # Load heavy resources ONCE, without blocking the event loop.
   # asyncio.to_thread runs blocking calls in a threadpool.
   nlp = spacy.load("en_core_web_sm")
 
+  skills_service = SkillsService()
   # This can take a while. Skills are retrieved from an external service and
   # there could be around 20,000 of them.
-  esco_skill_labels = load_all_skills()
+  esco_skill_labels = skills_service.get_skills()
 
   # Build matcher once at startup. All skills have to be added to the matcher.
   matcher = build_matcher(nlp, esco_skill_labels)
