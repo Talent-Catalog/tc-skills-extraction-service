@@ -12,7 +12,7 @@ from fastapi import FastAPI, Request
 from typing import List
 import spacy
 from spacy.matcher import PhraseMatcher
-from app.models import ExtractSkillsResponse, ExtractSkillsRequest
+from app.models import SkillName, ExtractSkillsRequest
 from app.services.skills_extractor import SkillsExtractor
 from app.services.skills_service import SkillsService
 
@@ -56,9 +56,9 @@ async def lifespan(app_: FastAPI):
 
 app = FastAPI(title="Skills Extractor API", lifespan=lifespan)
 
-@app.post("/extract_skills", response_model=ExtractSkillsResponse)
+@app.post("/extract_skills", response_model=List[SkillName])
 def extract_skills(
-    payload: ExtractSkillsRequest, request: Request,) -> ExtractSkillsResponse:
+    payload: ExtractSkillsRequest, request: Request,) -> List[SkillName]:
   """
   Extract skills from the given text
   :param payload: the text to extract skills from
@@ -67,7 +67,7 @@ def extract_skills(
   """
   extractor = get_extractor(request)
   result = extractor.extract_skills(payload.text)
-  return ExtractSkillsResponse(skills=result)
+  return result
 
 @app.get("/readyz")
 def readyz(request: Request):
