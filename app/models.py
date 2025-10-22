@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 
 class ExtractSkillsRequest(BaseModel):
+  lang: str = Field("en", description="Language - eg 'en' for English")
   text: str = Field(..., description="The text to extract skills from")
 
 class SkillName(BaseModel):
