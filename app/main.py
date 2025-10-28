@@ -4,7 +4,19 @@ Dependencies:
 #see https://realpython.com/get-started-with-fastapi/
 # Note also Intellij's support for FastAPI development
 # https://www.jetbrains.com/guide/tags/fastapi/
+
+# Note also that we should be running Python version 3.12 - because we are not
+# sure that the libraries that we use have been converted to later versions.
+
+# Run the following command in your Intellij terminal (which will be running
+# in the same virtual environment (venv) as your Intellij project.
+# There will be a .venv subdirectory in your project directory.
+ 
 python -m pip install "fastapi[standard]"
+
+pip install spacy
+
+python -m spacy download en_core_web_sm  
 
 """
 from contextlib import asynccontextmanager
