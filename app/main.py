@@ -14,10 +14,15 @@ Dependencies:
  
 python -m pip install "fastapi[standard]"
 
+pip install pydantic-settings
+
 pip install spacy
 
 python -m spacy download en_core_web_sm  
 
+# Run the app with:
+
+uvicorn app.main:app --reload
 """
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request

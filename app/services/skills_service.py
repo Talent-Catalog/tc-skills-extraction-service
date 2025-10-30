@@ -1,6 +1,6 @@
 import requests
 from app.models import SkillName
-
+from app.settings import settings
 from typing import List
 
 class SkillsService:
@@ -8,8 +8,7 @@ class SkillsService:
   Service which loads all known skills from the skills-api of the TC server
   """
   def __init__(self):
-    # todo This needs to be configurable
-    self.base_url = "http://localhost:8080/api/public/skill/names"
+    self.base_url = str(settings.SKILLS_BASE_URL)
 
   def get_skills(self) -> List[str]:
     items: List[SkillName] = self.__load_all_items()
