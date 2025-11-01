@@ -7,7 +7,7 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  ECR_REPOSITORY: tc-skills
+  ECR_REPOSITORY: tc-skills-extraction
   DOCKERFILE: Dockerfile
 
 jobs:
