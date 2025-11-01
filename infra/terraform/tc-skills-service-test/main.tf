@@ -2,7 +2,8 @@ module tc-test {
   source = "./.."
   project_name = "tc-skills-extraction"
   project_description = "Staging setup for tc-skills-extraction"
-  image_tag = "1.0.1-SNAPSHOT"
+  # image_tag = "1.0.1-SNAPSHOT"
+  image_tag = "staging-latest"
   fargate_cpu = 512
   fargate_memory = 2048
   dns_namespace = "tc-skills-extraction.local"
