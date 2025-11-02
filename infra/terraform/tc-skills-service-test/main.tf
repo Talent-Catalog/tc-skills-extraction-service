@@ -9,7 +9,7 @@ module tc-test {
   dns_namespace = "tc-skills-extraction.local"
   app_port = 8083
   health_check_path = "/readyz"
-  tc_skills_base_url = "https://tctalent-test.org/api/public/skills/names"
+  tc_skills_base_url = "https://tctalent-test.org/api/public/skill/names"
   acm_certificate_arn = "arn:aws:acm:us-east-1:231168606641:certificate/3a502945-f505-46f9-aa08-523c2be2593d"
 }
 
