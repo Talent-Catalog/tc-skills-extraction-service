@@ -22,7 +22,7 @@ python -m spacy download en_core_web_sm
 
 # Run the app with:
 
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --log-config=log_conf.yaml
 """
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
