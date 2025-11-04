@@ -10,7 +10,7 @@ module tc-test {
   app_port = 8000
   health_check_path = "/readyz"
   tc_skills_base_url = "https://tctalent-test.org/api/public/skill/names"
-  acm_certificate_arn = "arn:aws:acm:us-east-1:231168606641:certificate/3a502945-f505-46f9-aa08-523c2be2593d"
+  acm_certificate_arn = "arn:aws:acm:us-east-1:231168606641:certificate/271e71b8-6431-44ca-82e9-aeb9295afccf"
 }
 
 terraform {
