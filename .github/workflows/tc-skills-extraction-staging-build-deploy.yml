@@ -1,4 +1,4 @@
-name: tc-skills-build-push
+name: tc-skills-build-push-staging
 
 on:
   push:
