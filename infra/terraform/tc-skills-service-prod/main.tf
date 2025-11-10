@@ -3,7 +3,7 @@ module tc-test {
   project_name = "tc-skills-extraction"
   project_description = "Production setup for tc-skills-extraction"
   # image_tag = "1.0.1-SNAPSHOT"
-  image_tag = "prodcution-latest"
+  image_tag = "production-latest"
   fargate_cpu = 512
   fargate_memory = 2048
   dns_namespace = "tc-skills-extraction.local"
