@@ -4,7 +4,7 @@ POST http://localhost:8000/extract_skills
 Content-Type: application/json
 
 {
-  "text": "John is a Java programmer who knows Spring Boot a bit"
+  "text": "John is a Java and Typescript programmer who knows Spring Boot a bit"
 }
 
 ###
