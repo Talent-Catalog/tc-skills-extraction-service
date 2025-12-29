@@ -239,7 +239,7 @@ GitHub issue to provide the proper context for your PR.
 See [the README for how to do a release](README.md).
 
 
-[new issue]: https://github.com/Talent-Catalog/tc-api-spec/issues/new
+[new issue]: https://github.com/Talent-Catalog/tc-skills-extraction-service/issues/new
 [fork talentcatalog]: https://help.github.com/articles/fork-a-repo
 [collaborate with issues and pull requests]: https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests
 [fork and pull model]: https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/about-collaborative-development-models
