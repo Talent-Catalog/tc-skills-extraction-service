@@ -1,3 +1,16 @@
+# Configure the AWS provider
+# NOTE: Provider configuration MUST remain here (cannot be moved to parent module).
+# Providers cannot have configuration parameters injected via module variables.
+# Each environment targets a different AWS account via different assume_role ARNs.
+# OPC staging account: 164804461258
+provider "aws" {
+  region = "eu-west-2"
+
+  assume_role {
+    role_arn = "arn:aws:iam::164804461258:role/opc-staging-terraform-exec"
+  }
+}
+
 module tc-opc-test {
   source = "./.."
   project_name = "tc-skills-extraction"
