@@ -13,7 +13,7 @@ module tc-test {
   dns_namespace = "tc-skills-extraction.local"
   app_port = 8000
   health_check_path = "/readyz"
-  acm_certificate_arn = "arn:aws:acm:us-east-1:231168606641:certificate/271e71b8-6431-44ca-82e9-aeb9295afccf"
+  site_domain = "tctalent-test.org"
 
   # SSM parameter values — initially set here, but can be subsequently updated directly
   # in AWS SSM Parameter Store without requiring a Terraform apply
