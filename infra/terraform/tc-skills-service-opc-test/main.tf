@@ -23,11 +23,11 @@ module tc-opc-test {
   dns_namespace = "tc-skills-extraction.local"
   app_port = 8000
   health_check_path = "/readyz"
-  site_domain = "skills.test.tctalent.org"
+  site_domain = "test.skills.plus.tctalent.org"
 
   # SSM parameter values — initially set here, but can be subsequently updated directly
   # in AWS SSM Parameter Store without requiring a Terraform apply
-  tc_skills_base_url = "https://skills.test.tctalent.org/api/public/skill/names"
+  tc_skills_base_url = "https://test.skills.plus.tctalent.org/api/public/skill/names"
 }
 
 # Configure the opc-staging terraform workspace
