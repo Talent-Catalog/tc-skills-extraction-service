@@ -13,11 +13,15 @@ module tc-opc-test {
   acm_certificate_arn = "<OPC_STAGING_ACM_CERTIFICATE_ARN>"
 }
 
+# Configure the opc-staging terraform workspace
+# NOTE: The terraform block with backend configuration MUST remain in this file (cannot be moved to parent module).
+# This is because backend configuration can only exist in the root module where terraform init/apply is run
 terraform {
   backend "s3" {
-    bucket         = "tc-skills-extraction-terraform-state-opc-test"
-    key            = "state/terraform.tfstate"
+    bucket         = "opc-shared-terraform-state"
+    key            = "staging/tc-skills-extraction/terraform.tfstate"
     region         = "eu-west-2"
+    dynamodb_table = "opc-terraform-locks"
     encrypt        = true
   }
 }
