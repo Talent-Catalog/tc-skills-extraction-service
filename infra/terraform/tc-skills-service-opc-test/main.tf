@@ -2,6 +2,7 @@ module tc-opc-test {
   source = "./.."
   project_name = "tc-skills-extraction"
   project_description = "OPC staging setup for tc-skills-extraction"
+  aws_region = "eu-west-2"
   image_tag = "staging-latest"
   fargate_cpu = 512
   fargate_memory = 2048
