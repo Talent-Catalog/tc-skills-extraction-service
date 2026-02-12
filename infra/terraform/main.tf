@@ -171,6 +171,10 @@ module "ecs_service" {
     }
   }
 
+  # Ensure ALB listeners are created (and target group is associated with the load
+  # balancer) before the ECS service attempts to register with the target group
+  depends_on = [module.alb]
+
   service_tags = {
     Name = "${local.name}-service"
   }
