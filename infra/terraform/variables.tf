@@ -42,6 +42,10 @@ variable "fargate_memory" {
   default     = "4096"
 }
 
+variable "environment" {
+  description = "Deployment environment (e.g. staging, production, opc-staging)"
+}
+
 variable "tc_skills_base_url" {
   description = "Talent Catalog skills base url"
 }

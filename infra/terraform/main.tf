@@ -1,8 +1,6 @@
 # Use standard Terraform AWS modules where possible.
 # See https://registry.terraform.io/browse/modules?provider=aws
 
-# todo Use secrets manager
-
 terraform {
   required_providers {
     aws = {
@@ -80,6 +78,11 @@ module "ecs_service" {
   # Enables ECS Exec
   enable_execute_command = true
 
+  # Task execution role - needed for ECS to pull secrets from SSM Parameter Store
+  create_task_exec_iam_role = true
+  create_task_exec_policy   = true
+  task_exec_ssm_param_arns  = [aws_ssm_parameter.skills_base_url.arn]
+
   # Container definition(s)
   container_definitions = {
 
@@ -98,10 +101,10 @@ module "ecs_service" {
         }
       ]
 
-      environment = [
+      secrets = [
         {
-          name  = "SKILLS_BASE_URL"
-          value = var.tc_skills_base_url
+          name      = "SKILLS_BASE_URL"
+          valueFrom = aws_ssm_parameter.skills_base_url.arn
         }
       ]
 
@@ -232,6 +235,16 @@ module "security_group" {
   # ]
 
   tags = local.tags
+}
+
+################################################################################
+# SSM Parameters
+################################################################################
+
+resource "aws_ssm_parameter" "skills_base_url" {
+  name  = "/${var.project_name}/${var.environment}/SKILLS_BASE_URL"
+  type  = "String"
+  value = var.tc_skills_base_url
 }
 
 resource "aws_ecr_repository" "repo" {
