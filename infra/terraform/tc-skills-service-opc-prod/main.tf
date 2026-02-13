@@ -36,7 +36,7 @@ module tc-opc-prod {
 terraform {
   backend "s3" {
     bucket         = "opc-shared-terraform-state"
-    key            = "production/tc-skills-extraction/terraform.tfstate"
+    key            = "prod/tc-skills-extraction/terraform.tfstate"
     region         = "eu-west-2"
     dynamodb_table = "opc-terraform-locks"
     encrypt        = true
