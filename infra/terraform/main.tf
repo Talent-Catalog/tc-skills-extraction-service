@@ -251,15 +251,6 @@ resource "aws_ssm_parameter" "skills_base_url" {
   value = var.tc_skills_base_url
 }
 
-resource "aws_ecr_repository" "repo" {
-  name                 = local.name
-  image_tag_mutability = "MUTABLE"
-
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-}
-
 resource "aws_service_discovery_http_namespace" "this" {
   name        = local.name
   description = "CloudMap namespace for ${local.name}"
