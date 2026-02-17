@@ -11,23 +11,25 @@ provider "aws" {
   }
 }
 
+# tc-skills-extraction infrastructure for OPC AWS production account
 module tc-opc-prod {
   source = "./.."
-  project_name = "tc-skills-extraction"
-  project_description = "OPC production setup for tc-skills-extraction"
-  environment = "opc-production"
-  aws_region = "eu-west-2"
-  image_tag = "production-latest"
-  fargate_cpu = 512
-  fargate_memory = 2048
-  dns_namespace = "tc-skills-extraction.local"
-  app_port = 8000
-  health_check_path = "/readyz"
-  site_domain = "skills.plus.tctalent.org"
 
-  # SSM parameter values — initially set here, but can be subsequently updated directly
-  # in AWS SSM Parameter Store without requiring a Terraform apply
-  tc_skills_base_url = "https://skills.plus.tctalent.org/api/public/skill/names"
+  # Provided as Terraform inputs
+  project_name        = "tc-skills-extraction"
+  project_description = "OPC production setup for tc-skills-extraction"
+  environment         = "opc-production"
+  aws_region          = "eu-west-2"
+  image_tag           = "production-latest"
+  fargate_cpu         = 512
+  fargate_memory      = 2048
+  dns_namespace       = "tc-skills-extraction.local"
+  app_port            = 8000
+  health_check_path   = "/readyz"
+  site_domain         = "skills.plus.tctalent.org"
+
+  # SSM-backed (stored in SSM, injected into ECS task)
+  tc_skills_base_url  = "https://skills.plus.tctalent.org/api/public/skill/names"
 }
 
 # Configure the opc-production terraform workspace

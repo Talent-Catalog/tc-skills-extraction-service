@@ -11,23 +11,25 @@ provider "aws" {
   }
 }
 
+# tc-skills-extraction infrastructure for OPC AWS staging account
 module tc-opc-test {
   source = "./.."
-  project_name = "tc-skills-extraction"
-  project_description = "OPC staging setup for tc-skills-extraction"
-  environment = "opc-staging"
-  aws_region = "eu-west-2"
-  image_tag = "staging-latest"
-  fargate_cpu = 512
-  fargate_memory = 2048
-  dns_namespace = "tc-skills-extraction.local"
-  app_port = 8000
-  health_check_path = "/readyz"
-  site_domain = "test.skills.plus.tctalent.org"
 
-  # SSM parameter values — initially set here, but can be subsequently updated directly
-  # in AWS SSM Parameter Store without requiring a Terraform apply
-  tc_skills_base_url = "https://test.skills.plus.tctalent.org/api/public/skill/names"
+  # Provided as Terraform inputs
+  project_name        = "tc-skills-extraction"
+  project_description = "OPC staging setup for tc-skills-extraction"
+  environment         = "opc-staging"
+  aws_region          = "eu-west-2"
+  image_tag           = "staging-latest"
+  fargate_cpu         = 512
+  fargate_memory      = 2048
+  dns_namespace       = "tc-skills-extraction.local"
+  app_port            = 8000
+  health_check_path   = "/readyz"
+  site_domain         = "test.skills.plus.tctalent.org"
+
+  # SSM-backed (stored in SSM, injected into ECS task)
+  tc_skills_base_url  = "https://test.skills.plus.tctalent.org/api/public/skill/names"
 }
 
 # Configure the opc-staging terraform workspace
