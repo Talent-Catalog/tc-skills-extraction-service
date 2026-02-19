@@ -12,7 +12,7 @@ provider "aws" {
 }
 
 # tc-skills-extraction infrastructure for OPC AWS production account
-module tc-opc-prod {
+module "tc-opc-prod" {
   source = "./.."
 
   # Provided as Terraform inputs
