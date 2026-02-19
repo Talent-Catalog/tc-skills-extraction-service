@@ -42,10 +42,14 @@ variable "fargate_memory" {
   default     = "4096"
 }
 
+variable "environment" {
+  description = "Deployment environment (e.g. staging, production, opc-staging)"
+}
+
 variable "tc_skills_base_url" {
   description = "Talent Catalog skills base url"
 }
 
-variable "acm_certificate_arn" {
-  description = "The ARN of an ACM certificate"
+variable "site_domain" {
+  description = "The domain name for the ACM certificate (e.g. skills.staging.example.org)"
 }
