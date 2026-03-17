@@ -29,7 +29,7 @@ module "tc-opc-test" {
   site_domain         = "test.skills.tctalent.org"
 
   # SSM-backed (stored in SSM, injected into ECS task)
-  tc_skills_base_url  = "https://test.plus.tctalent.org/api/public/skill/names"
+  tc_skills_base_url  = "https://tctalent-test.org/api/public/skill/names"
 }
 
 # Configure the opc-staging terraform workspace
