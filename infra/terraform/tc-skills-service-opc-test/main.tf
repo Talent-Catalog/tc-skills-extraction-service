@@ -26,7 +26,7 @@ module "tc-opc-test" {
   dns_namespace       = "tc-skills-extraction.local"
   app_port            = 8000
   health_check_path   = "/readyz"
-  site_domain         = "test.skills.plus.tctalent.org"
+  site_domain         = "test.skills.tctalent.org"
 
   # SSM-backed (stored in SSM, injected into ECS task)
   tc_skills_base_url  = "https://test.plus.tctalent.org/api/public/skill/names"
