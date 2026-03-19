@@ -12,7 +12,7 @@ provider "aws" {
 }
 
 # tc-skills-extraction infrastructure for OPC AWS staging account
-module tc-opc-test {
+module "tc-opc-test" {
   source = "./.."
 
   # Provided as Terraform inputs
@@ -29,7 +29,7 @@ module tc-opc-test {
   site_domain         = "test.skills.plus.tctalent.org"
 
   # SSM-backed (stored in SSM, injected into ECS task)
-  tc_skills_base_url  = "https://test.skills.plus.tctalent.org/api/public/skill/names"
+  tc_skills_base_url  = "https://test.plus.tctalent.org/api/public/skill/names"
 }
 
 # Configure the opc-staging terraform workspace

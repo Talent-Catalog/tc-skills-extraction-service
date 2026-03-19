@@ -12,7 +12,7 @@ provider "aws" {
 }
 
 # tc-skills-extraction infrastructure for OPC AWS production account
-module tc-opc-prod {
+module "tc-opc-prod" {
   source = "./.."
 
   # Provided as Terraform inputs
@@ -29,7 +29,7 @@ module tc-opc-prod {
   site_domain         = "skills.plus.tctalent.org"
 
   # SSM-backed (stored in SSM, injected into ECS task)
-  tc_skills_base_url  = "https://skills.plus.tctalent.org/api/public/skill/names"
+  tc_skills_base_url  = "https://plus.tctalent.org/api/public/skill/names"
 }
 
 # Configure the opc-production terraform workspace
