@@ -16,3 +16,7 @@ docker run --rm -p 8000:8000 \
   -e SKILLS_BASE_URL=http://host.docker.internal:8080/api/public/skill/names \
   tc-skills:local
 ```
+## Running in IntelliJ
+
+See comments in `main.py` for instructions on how to run the service in IntelliJ or manually from
+a terminal.
