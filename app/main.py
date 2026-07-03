@@ -7,6 +7,7 @@ Dependencies:
 
 # Note also that we should be running Python version 3.12 - because we are not
 # sure that the libraries that we use have been converted to later versions.
+# See https://pypi.org/project/spacy/
 
 # Run the following command in your Intellij terminal (which will be running
 # in the same virtual environment (venv) as your Intellij project.
