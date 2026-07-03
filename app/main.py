@@ -11,18 +11,32 @@ Dependencies:
 # Run the following command in your Intellij terminal (which will be running
 # in the same virtual environment (venv) as your Intellij project.
 # There will be a .venv subdirectory in your project directory.
- 
+
 python -m pip install "fastapi[standard]"
+
+(Note that fastapi[standard] includes uvicorn, pydantic, and other dependencies)
 
 pip install pydantic-settings
 
 pip install spacy
 
-python -m spacy download en_core_web_sm  
+python -m spacy download en_core_web_sm
 
 # Run the app with:
 
 uvicorn app.main:app --reload --log-config=log_conf.yaml
+
+OPTIONALLY...
+# Run the app inside Intellij
+
+You need to have installed all the above pip and python commands so that all
+the libraries are entered into the virtual environment (venv) of your Intellij project.
+
+Create a new Intellij run configuration. Press + and select Python.
+Select "module" (not "script") and enter "uvicorn" in the module field.
+In the parameters field, enter "app.main:app --log-config=log_conf.yaml"
+Select the Python interpreter that is the same as your project interpreter (the venv).
+
 """
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request

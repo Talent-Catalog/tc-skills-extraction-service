@@ -5,7 +5,8 @@ from typing import List
 
 class SkillsService:
   """
-  Service which loads all known skills from the skills-api of the TC server
+  Service that loads all known skills from the skills-api of the TC server.
+  See the SkillAdminApi controller of the TC Spring Server.
   """
   def __init__(self):
     self.base_url = str(settings.SKILLS_BASE_URL)
