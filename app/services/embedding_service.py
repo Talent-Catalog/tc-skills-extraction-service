@@ -3,13 +3,35 @@ from functools import lru_cache
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-from app.embedding_models import EmbeddingModelDetails
+from app.embedding_models import (
+  EmbeddingConfigurationVersion,
+  EmbeddingModelDetails,
+)
+from app.services.text_preprocessor import SpacyTextPreprocessor
 
 
 class EmbeddingService:
   """
-  Generates text embeddings using Sentence Transformers.
+  Generates embeddings using Sentence Transformers.
+
+  Depending on the configuration version, the original text may first be
+  processed by spaCy.
   """
+
+  def __init__(
+      self,
+      text_preprocessor: SpacyTextPreprocessor | None = None,
+  ) -> None:
+    """
+    Create the embedding service.
+
+    Args:
+        text_preprocessor: Optional preprocessor, primarily useful for
+            dependency injection in tests.
+    """
+    self._text_preprocessor = (
+        text_preprocessor or SpacyTextPreprocessor()
+    )
 
   def generate_embedding(
       self,
@@ -37,10 +59,17 @@ class EmbeddingService:
     if not text.strip():
       raise ValueError("Text must not be empty")
 
+    prepared_text = self.prepare_text(
+      text=text,
+      configuration_version=(
+        model_details.configuration_version
+      ),
+    )
+
     model = self._load_model(model_details.model_name)
 
     embedding = model.encode(
-      text,
+      prepared_text,
       convert_to_numpy=True,
       normalize_embeddings=True,
     )
@@ -61,13 +90,38 @@ class EmbeddingService:
 
     return vector.tolist()
 
+  def prepare_text(
+      self,
+      text: str,
+      configuration_version: EmbeddingConfigurationVersion,
+  ) -> str:
+    """
+    Prepare text according to the selected configuration version.
+
+    This method is public so preprocessing can be tested independently
+    from embedding generation.
+    """
+    if (
+        configuration_version
+        == EmbeddingConfigurationVersion.SBERT_RAW_V1
+    ):
+      return text
+
+    if (
+        configuration_version
+        == EmbeddingConfigurationVersion.SPACY_PREPROCESSING_V1
+    ):
+      return self._text_preprocessor.preprocess_v1(text)
+
+    raise ValueError(
+      f"Unsupported embedding configuration version: "
+      f"{configuration_version}"
+    )
+
   @staticmethod
   @lru_cache(maxsize=4)
   def _load_model(model_name: str) -> SentenceTransformer:
     """
-    Load and cache a Sentence Transformers model.
-
-    Loading a model is expensive, so each model is loaded only once
-    for the lifetime of the Python process.
+    Load and cache each Sentence Transformers model.
     """
     return SentenceTransformer(model_name)

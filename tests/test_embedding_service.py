@@ -1,9 +1,14 @@
 import numpy as np
 import pytest
 
-from app.embedding_models import EmbeddingModelDetails
-from app.services.embedding_service import EmbeddingService
+from unittest.mock import Mock
 
+from app.embedding_models import (
+  EmbeddingConfigurationVersion,
+  EmbeddingModelDetails
+)
+
+from app.services.embedding_service import EmbeddingService
 
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 MODEL_DIMENSIONS = 384
@@ -21,17 +26,30 @@ def embedding_service() -> EmbeddingService:
 
 
 @pytest.fixture(scope="module")
-def model_details() -> EmbeddingModelDetails:
+def raw_model_details() -> EmbeddingModelDetails:
   """
-  Describe the model used by the tests.
-
-  all-MiniLM-L6-v2 generates embeddings containing 384 values.
+  Model configuration without preprocessing.
   """
   return EmbeddingModelDetails(
     model_name=MODEL_NAME,
     dimensions=MODEL_DIMENSIONS,
+    configuration_version=(
+      EmbeddingConfigurationVersion.SBERT_RAW_V1
+    ),
   )
 
+@pytest.fixture(scope="module")
+def preprocessed_model_details() -> EmbeddingModelDetails:
+  """
+  Model configuration using spaCy preprocessing V1.
+  """
+  return EmbeddingModelDetails(
+    model_name=MODEL_NAME,
+    dimensions=MODEL_DIMENSIONS,
+    configuration_version=(
+      EmbeddingConfigurationVersion.SPACY_PREPROCESSING_V1
+    ),
+  )
 
 def cosine_similarity(
     first_embedding: list[float],
@@ -73,7 +91,7 @@ def cosine_similarity(
 
 def test_generate_embedding_returns_expected_dimensions(
     embedding_service: EmbeddingService,
-    model_details: EmbeddingModelDetails,
+    raw_model_details: EmbeddingModelDetails,
 ) -> None:
   """
   Verify that the model generates the configured number of dimensions.
@@ -83,7 +101,7 @@ def test_generate_embedding_returns_expected_dimensions(
       "Experienced accountant with bookkeeping and "
       "financial reporting skills."
     ),
-    model_details=model_details,
+    model_details=raw_model_details,
   )
 
   assert len(embedding) == MODEL_DIMENSIONS
@@ -91,14 +109,14 @@ def test_generate_embedding_returns_expected_dimensions(
 
 def test_generate_embedding_returns_floats(
     embedding_service: EmbeddingService,
-    model_details: EmbeddingModelDetails,
+    raw_model_details: EmbeddingModelDetails,
 ) -> None:
   """
   Verify that the returned embedding can be serialized as JSON numbers.
   """
   embedding = embedding_service.generate_embedding(
     text="Experienced software engineer",
-    model_details=model_details,
+    model_details=raw_model_details,
   )
 
   assert embedding
@@ -110,14 +128,14 @@ def test_generate_embedding_returns_floats(
 
 def test_generated_embedding_is_normalized(
     embedding_service: EmbeddingService,
-    model_details: EmbeddingModelDetails,
+    raw_model_details: EmbeddingModelDetails,
 ) -> None:
   """
   Verify that normalize_embeddings=True produces a unit-length vector.
   """
   embedding = embedding_service.generate_embedding(
     text="Experienced accountant and financial analyst",
-    model_details=model_details,
+    model_details=raw_model_details,
   )
 
   vector_length = np.linalg.norm(
@@ -135,7 +153,7 @@ def test_generated_embedding_is_normalized(
 
 def test_same_text_generates_same_embedding(
     embedding_service: EmbeddingService,
-    model_details: EmbeddingModelDetails,
+    raw_model_details: EmbeddingModelDetails,
 ) -> None:
   """
   Verify that embedding generation is deterministic for the same model
@@ -145,12 +163,12 @@ def test_same_text_generates_same_embedding(
 
   first_embedding = embedding_service.generate_embedding(
     text=text,
-    model_details=model_details,
+    model_details=raw_model_details,
   )
 
   second_embedding = embedding_service.generate_embedding(
     text=text,
-    model_details=model_details,
+    model_details=raw_model_details,
   )
 
   assert first_embedding == pytest.approx(
@@ -161,7 +179,7 @@ def test_same_text_generates_same_embedding(
 
 def test_empty_text_is_rejected(
     embedding_service: EmbeddingService,
-    model_details: EmbeddingModelDetails,
+    raw_model_details: EmbeddingModelDetails,
 ) -> None:
   """
   Verify that empty or whitespace-only input is rejected.
@@ -172,7 +190,7 @@ def test_empty_text_is_rejected(
   ):
     embedding_service.generate_embedding(
       text="   ",
-      model_details=model_details,
+      model_details=raw_model_details,
     )
 
 
@@ -186,6 +204,9 @@ def test_unexpected_dimensions_are_rejected(
   incorrect_model_details = EmbeddingModelDetails(
     model_name=MODEL_NAME,
     dimensions=768,
+    configuration_version=(
+      EmbeddingConfigurationVersion.SBERT_RAW_V1
+    ),
   )
 
   with pytest.raises(
@@ -200,7 +221,7 @@ def test_unexpected_dimensions_are_rejected(
 
 def test_similar_texts_have_high_similarity(
     embedding_service: EmbeddingService,
-    model_details: EmbeddingModelDetails,
+    raw_model_details: EmbeddingModelDetails,
 ) -> None:
   """
   Demonstrate cosine similarity between two texts with similar meanings.
@@ -217,12 +238,12 @@ def test_similar_texts_have_high_similarity(
 
   first_embedding = embedding_service.generate_embedding(
     text=first_text,
-    model_details=model_details,
+    model_details=raw_model_details,
   )
 
   second_embedding = embedding_service.generate_embedding(
     text=second_text,
-    model_details=model_details,
+    model_details=raw_model_details,
   )
 
   similarity = cosine_similarity(
@@ -240,7 +261,7 @@ def test_similar_texts_have_high_similarity(
 
 def test_related_texts_are_more_similar_than_unrelated_texts(
     embedding_service: EmbeddingService,
-    model_details: EmbeddingModelDetails,
+    raw_model_details: EmbeddingModelDetails,
 ) -> None:
   """
   Demonstrate that a job description is closer to a related candidate
@@ -263,17 +284,17 @@ def test_related_texts_are_more_similar_than_unrelated_texts(
 
   opportunity_embedding = embedding_service.generate_embedding(
     text=opportunity_text,
-    model_details=model_details,
+    model_details=raw_model_details,
   )
 
   related_embedding = embedding_service.generate_embedding(
     text=related_candidate_text,
-    model_details=model_details,
+    model_details=raw_model_details,
   )
 
   unrelated_embedding = embedding_service.generate_embedding(
     text=unrelated_candidate_text,
-    model_details=model_details,
+    model_details=raw_model_details,
   )
 
   related_similarity = cosine_similarity(
@@ -296,3 +317,177 @@ def test_related_texts_are_more_similar_than_unrelated_texts(
   )
 
   assert related_similarity > unrelated_similarity
+
+def test_raw_configuration_does_not_preprocess_text() -> None:
+  """
+  Verify that SBERT_RAW_V1 returns the original text unchanged.
+  """
+  preprocessor = Mock()
+  service = EmbeddingService(
+    text_preprocessor=preprocessor,
+  )
+
+  original_text = "The accountants prepared reports."
+
+  prepared_text = service.prepare_text(
+    text=original_text,
+    configuration_version=(
+      EmbeddingConfigurationVersion.SBERT_RAW_V1
+    ),
+  )
+
+  assert prepared_text == original_text
+  preprocessor.preprocess_v1.assert_not_called()
+
+
+def test_spacy_configuration_preprocesses_text() -> None:
+  """
+  Verify that SPACY_PREPROCESSING_V1 invokes the spaCy preprocessor.
+  """
+  preprocessor = Mock()
+  preprocessor.preprocess_v1.return_value = (
+    "accountant prepare report"
+  )
+
+  service = EmbeddingService(
+    text_preprocessor=preprocessor,
+  )
+
+  prepared_text = service.prepare_text(
+    text="The accountants prepared reports.",
+    configuration_version=(
+      EmbeddingConfigurationVersion.SPACY_PREPROCESSING_V1
+    ),
+  )
+
+  assert prepared_text == "accountant prepare report"
+
+  preprocessor.preprocess_v1.assert_called_once_with(
+    "The accountants prepared reports."
+  )
+
+def test_preprocessing_reduces_difference_between_word_forms(
+    embedding_service: EmbeddingService,
+    raw_model_details: EmbeddingModelDetails,
+    preprocessed_model_details: EmbeddingModelDetails,
+) -> None:
+  """
+  Compare texts that use different grammatical forms of the same concepts.
+
+  This demonstrates the intended benefit of lemmatization. The printed
+  values should be treated as experimental observations rather than as
+  universal similarity thresholds.
+  """
+  first_text = (
+    "Accountants managed budgets, reconciled accounts, "
+    "and prepared financial reports."
+  )
+
+  second_text = (
+    "An accountant manages budgeting, reconciles account balances, "
+    "and prepares financial reporting."
+  )
+
+  raw_first = embedding_service.generate_embedding(
+    text=first_text,
+    model_details=raw_model_details,
+  )
+
+  raw_second = embedding_service.generate_embedding(
+    text=second_text,
+    model_details=raw_model_details,
+  )
+
+  preprocessed_first = embedding_service.generate_embedding(
+    text=first_text,
+    model_details=preprocessed_model_details,
+  )
+
+  preprocessed_second = embedding_service.generate_embedding(
+    text=second_text,
+    model_details=preprocessed_model_details,
+  )
+
+  raw_similarity = cosine_similarity(
+    raw_first,
+    raw_second,
+  )
+
+  preprocessed_similarity = cosine_similarity(
+    preprocessed_first,
+    preprocessed_second,
+  )
+
+  print(
+    f"\nRaw similarity:          {raw_similarity:.4f}"
+  )
+  print(
+    f"Preprocessed similarity: {preprocessed_similarity:.4f}"
+  )
+
+  assert preprocessed_similarity > raw_similarity
+
+def test_preprocessing_improves_similarity_for_noisy_text(
+    embedding_service: EmbeddingService,
+    raw_model_details: EmbeddingModelDetails,
+    preprocessed_model_details: EmbeddingModelDetails,
+) -> None:
+  """
+  Demonstrate preprocessing on text containing punctuation, boilerplate,
+  casing differences and repeated function words.
+  """
+  opportunity_text = (
+    "Accountant required for bookkeeping, account reconciliation, "
+    "budget management and financial reporting."
+  )
+
+  noisy_candidate_text = (
+    "THE candidate has been responsible for the MANAGEMENT of budgets; "
+    "they were RECONCILING the accounts, and they have also PREPARED "
+    "the monthly financial reports!!!"
+  )
+
+  raw_opportunity = embedding_service.generate_embedding(
+    text=opportunity_text,
+    model_details=raw_model_details,
+  )
+
+  raw_candidate = embedding_service.generate_embedding(
+    text=noisy_candidate_text,
+    model_details=raw_model_details,
+  )
+
+  preprocessed_opportunity = (
+    embedding_service.generate_embedding(
+      text=opportunity_text,
+      model_details=preprocessed_model_details,
+    )
+  )
+
+  preprocessed_candidate = (
+    embedding_service.generate_embedding(
+      text=noisy_candidate_text,
+      model_details=preprocessed_model_details,
+    )
+  )
+
+  raw_similarity = cosine_similarity(
+    raw_opportunity,
+    raw_candidate,
+  )
+
+  preprocessed_similarity = cosine_similarity(
+    preprocessed_opportunity,
+    preprocessed_candidate,
+  )
+
+  print(
+    f"\nRaw noisy-text similarity:          "
+    f"{raw_similarity:.4f}"
+  )
+  print(
+    f"Preprocessed noisy-text similarity: "
+    f"{preprocessed_similarity:.4f}"
+  )
+
+  assert preprocessed_similarity > raw_similarity
