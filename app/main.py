@@ -40,11 +40,15 @@ Select the Python interpreter that is the same as your project interpreter (the 
 
 """
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from typing import List
 import spacy
 from spacy.matcher import PhraseMatcher
+
+from app.embedding_models import GenerateEmbeddingResponse, \
+  GenerateEmbeddingRequest
 from app.models import SkillName, ExtractSkillsRequest
+from app.services.embedding_service import EmbeddingService
 from app.services.skills_extractor import SkillsExtractor
 from app.services.skills_service import SkillsService
 
@@ -88,6 +92,8 @@ async def lifespan(app_: FastAPI):
 
 app = FastAPI(title="Skills Extractor API", lifespan=lifespan)
 
+embedding_service = EmbeddingService()
+
 @app.post("/extract_skills", response_model=List[SkillName])
 def extract_skills(
     payload: ExtractSkillsRequest, request: Request,) -> List[SkillName]:
@@ -100,6 +106,33 @@ def extract_skills(
   extractor = get_extractor(request)
   result = extractor.extract_skills(payload.text)
   return result
+
+@app.post(
+  "/generate_embedding",
+  response_model=GenerateEmbeddingResponse,
+)
+def generate_embedding(
+    payload: GenerateEmbeddingRequest,
+) -> GenerateEmbeddingResponse:
+  """
+  Generate an embedding from the supplied text.
+  The embedding generation is delegated to EmbeddingService so that the
+  same code can be tested directly without using the REST API.
+  """
+  try:
+    embedding = embedding_service.generate_embedding(
+      text=payload.text,
+      model_details=payload.model,
+    )
+    return GenerateEmbeddingResponse(
+      dimensions=len(embedding),
+      embedding=embedding,
+    )
+  except (ValueError, OSError) as error:
+    raise HTTPException(
+      status_code=400,
+      detail=str(error),
+    ) from error
 
 @app.get("/readyz")
 def readyz(request: Request):
