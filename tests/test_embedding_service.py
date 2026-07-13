@@ -491,3 +491,195 @@ def test_preprocessing_improves_similarity_for_noisy_text(
   )
 
   assert preprocessed_similarity > raw_similarity
+
+@pytest.mark.parametrize(
+  (
+      "configuration_version",
+      "expected_method",
+      "expected_result",
+  ),
+  [
+    (
+        EmbeddingConfigurationVersion.SPACY_PREPROCESSING_V1,
+        "preprocess_v1",
+        "v1 text",
+    ),
+    (
+        EmbeddingConfigurationVersion.SPACY_PREPROCESSING_V2,
+        "preprocess_v2",
+        "v2 text",
+    ),
+    (
+        EmbeddingConfigurationVersion.SPACY_PREPROCESSING_V3,
+        "preprocess_v3",
+        "v3 text",
+    ),
+  ],
+)
+def test_prepare_text_selects_configured_preprocessor(
+    configuration_version: EmbeddingConfigurationVersion,
+    expected_method: str,
+    expected_result: str,
+) -> None:
+  """
+  Verify that each configuration version invokes the correct preprocessor.
+  """
+  preprocessor = Mock()
+
+  getattr(
+    preprocessor,
+    expected_method,
+  ).return_value = expected_result
+
+  service = EmbeddingService(
+    text_preprocessor=preprocessor,
+  )
+
+  result = service.prepare_text(
+    text="Original text",
+    configuration_version=configuration_version,
+  )
+
+  assert result == expected_result
+
+  getattr(
+    preprocessor,
+    expected_method,
+  ).assert_called_once_with("Original text")
+
+
+def test_raw_configuration_does_not_invoke_preprocessor() -> None:
+  """
+  Raw SBERT should receive the original text unchanged.
+  """
+  preprocessor = Mock()
+
+  service = EmbeddingService(
+    text_preprocessor=preprocessor,
+  )
+
+  result = service.prepare_text(
+    text="Original text",
+    configuration_version=(
+      EmbeddingConfigurationVersion.SBERT_RAW_V1
+    ),
+  )
+
+  assert result == "Original text"
+
+  preprocessor.preprocess_v1.assert_not_called()
+  preprocessor.preprocess_v2.assert_not_called()
+  preprocessor.preprocess_v3.assert_not_called()
+
+
+@pytest.mark.parametrize(
+  "configuration_version",
+  [
+    EmbeddingConfigurationVersion.SBERT_RAW_V1,
+    EmbeddingConfigurationVersion.SPACY_PREPROCESSING_V1,
+    EmbeddingConfigurationVersion.SPACY_PREPROCESSING_V2,
+    EmbeddingConfigurationVersion.SPACY_PREPROCESSING_V3,
+  ],
+)
+def test_embedding_configuration_ranks_related_candidate_higher(
+    embedding_service: EmbeddingService,
+    configuration_version: EmbeddingConfigurationVersion,
+) -> None:
+  """
+  Verify that every configuration ranks the related candidate above an
+  unrelated candidate.
+  """
+  model_details = EmbeddingModelDetails(
+    model_name=MODEL_NAME,
+    dimensions=MODEL_DIMENSIONS,
+    configuration_version=configuration_version,
+  )
+
+  opportunity_text = (
+    "Seeking an accountant experienced in bookkeeping, budgeting, "
+    "account reconciliation and financial reporting."
+  )
+
+  related_candidate_text = (
+    "The candidate managed budgets, reconciled company accounts, "
+    "maintained ledgers and prepared monthly financial reports."
+  )
+
+  unrelated_candidate_text = (
+    "The candidate prepared restaurant meals, designed menus, "
+    "ordered ingredients and supervised kitchen employees."
+  )
+
+  opportunity_embedding = embedding_service.generate_embedding(
+    text=opportunity_text,
+    model_details=model_details,
+  )
+
+  related_embedding = embedding_service.generate_embedding(
+    text=related_candidate_text,
+    model_details=model_details,
+  )
+
+  unrelated_embedding = embedding_service.generate_embedding(
+    text=unrelated_candidate_text,
+    model_details=model_details,
+  )
+
+  related_similarity = cosine_similarity(
+    opportunity_embedding,
+    related_embedding,
+  )
+
+  unrelated_similarity = cosine_similarity(
+    opportunity_embedding,
+    unrelated_embedding,
+  )
+
+  ranking_margin = (
+      related_similarity
+      - unrelated_similarity
+  )
+
+  print(
+    f"\nConfiguration:       {configuration_version.value}"
+  )
+  print(
+    f"Related similarity:  {related_similarity:.4f}"
+  )
+  print(
+    f"Unrelated similarity:{unrelated_similarity:.4f}"
+  )
+  print(
+    f"Ranking margin:       {ranking_margin:.4f}"
+  )
+
+  assert related_similarity > unrelated_similarity
+  assert ranking_margin > 0
+
+@pytest.mark.parametrize(
+  "configuration_version",
+  list(EmbeddingConfigurationVersion),
+)
+def test_display_prepared_text(
+    embedding_service: EmbeddingService,
+    configuration_version: EmbeddingConfigurationVersion,
+) -> None:
+  """
+  Display the exact text supplied to SBERT for each configuration.
+  """
+  original_text = (
+    "The accountants were managing the accounts "
+    "and preparing financial reports."
+  )
+
+  prepared_text = embedding_service.prepare_text(
+    text=original_text,
+    configuration_version=configuration_version,
+  )
+
+  print(
+    f"\n{configuration_version.value}:"
+    f"\n{prepared_text}"
+  )
+
+  assert prepared_text

@@ -5,15 +5,19 @@ from pydantic import BaseModel, Field
 
 class EmbeddingConfigurationVersion(str, Enum):
   """
-  Identifies the complete algorithm used to generate an embedding.
+  Identifies the preprocessing algorithm used before embedding generation.
 
-  Changing preprocessing rules should result in a new configuration version
-  so that stored embeddings remain reproducible.
+  A change to preprocessing creates a different embedding configuration,
+  even when the same Sentence Transformer model is used.
   """
 
   SBERT_RAW_V1 = "SBERT_RAW_V1"
+
   SPACY_PREPROCESSING_V1 = "SPACY_PREPROCESSING_V1"
 
+  SPACY_PREPROCESSING_V2 = "SPACY_PREPROCESSING_V2"
+
+  SPACY_PREPROCESSING_V3 = "SPACY_PREPROCESSING_V3"
 
 class EmbeddingModelDetails(BaseModel):
   """

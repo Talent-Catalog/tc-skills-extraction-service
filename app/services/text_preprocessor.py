@@ -1,17 +1,23 @@
+import re
+import unicodedata
 from functools import lru_cache
 from html import unescape
-import unicodedata
 
 import spacy
 from spacy.language import Language
+from spacy.tokens import Doc, Token
+
 
 class SpacyTextPreprocessor:
   """
-  Applies versioned text preprocessing before SBERT generation.
+  Applies versioned preprocessing to text before SBERT generates an
+  embedding.
   """
 
   SPACY_MODEL_NAME = "en_core_web_sm"
 
+  # These words are normally spaCy stop words, but removing them can reverse
+  # or seriously alter the meaning of a sentence.
   NEGATION_WORDS = {
     "no",
     "not",
@@ -23,107 +29,231 @@ class SpacyTextPreprocessor:
 
   def preprocess_v1(self, text: str) -> str:
     """
-    Apply spaCy preprocessing version 1.
+    Apply conservative basic cleanup.
 
-    V1 performs the following operations:
-
-    1. Decode HTML entities.
-    2. Apply Unicode normalization.
-    3. Tokenize using spaCy.
-    4. Remove whitespace and punctuation tokens.
-    5. Remove stop words.
-    6. Convert words to lowercase lemmas.
-    7. Retain numeric tokens.
-
-    Args:
-        text: Original text.
-
-    Returns:
-        Text prepared for SBERT.
-
-    Raises:
-        ValueError: If preprocessing removes all meaningful content.
+    V1:
+    - decodes HTML entities;
+    - applies Unicode normalization;
+    - replaces repeated whitespace with a single space;
+    - preserves natural-language wording;
+    - preserves punctuation;
+    - preserves stop words;
+    - does not lemmatise words.
     """
-    normalized_text = self._normalize_text(text)
+    return self._basic_cleanup(text)
 
-    nlp = self._load_spacy_model()
-    document = nlp(normalized_text)
+  def preprocess_v2(self, text: str) -> str:
+    """
+    Apply basic cleanup and lemmatisation.
 
+    V2:
+    - includes all V1 cleanup;
+    - converts normal words to their dictionary base form;
+    - preserves punctuation;
+    - preserves stop words.
+    """
+    cleaned_text = self._basic_cleanup(text)
+
+    document = self._process_with_spacy(cleaned_text)
+
+    processed_text = self._lemmatise_document(
+      document=document,
+      remove_stop_words=False,
+    )
+
+    return self._validate_result(processed_text)
+
+  def preprocess_v3(self, text: str) -> str:
+    """
+    Apply basic cleanup, lemmatisation and stop-word removal.
+
+    V3:
+    - includes all V1 cleanup;
+    - converts words to their dictionary base form;
+    - removes punctuation;
+    - removes stop words;
+    - preserves important negation words.
+    """
+    cleaned_text = self._basic_cleanup(text)
+
+    document = self._process_with_spacy(cleaned_text)
+
+    processed_text = self._lemmatise_document(
+      document=document,
+      remove_stop_words=True,
+    )
+
+    return self._validate_result(processed_text)
+
+  @staticmethod
+  def _basic_cleanup(text: str) -> str:
+    """
+    Perform cleanup that does not change the words or sentence meaning.
+    """
+    if not text or not text.strip():
+      raise ValueError("Text must not be empty")
+
+    # Convert values such as '&amp;' into '&'.
+    decoded_text = unescape(text)
+
+    # Normalize equivalent Unicode representations.
+    normalized_text = unicodedata.normalize(
+      "NFKC",
+      decoded_text,
+    )
+
+    # Convert newlines, tabs and repeated spaces into one normal space.
+    cleaned_text = re.sub(
+      r"\s+",
+      " ",
+      normalized_text,
+    ).strip()
+
+    if not cleaned_text:
+      raise ValueError("Text must not be empty")
+
+    return cleaned_text
+
+  def _lemmatise_document(
+      self,
+      document: Doc,
+      remove_stop_words: bool,
+  ) -> str:
+    """
+    Convert spaCy tokens into their normalized forms.
+    """
     processed_tokens: list[str] = []
 
     for token in document:
-      if token.is_space or token.is_punct:
+      if token.is_space:
         continue
 
-      """
-      Retain negation words even if they are stop words (the, a, an, etc), 
-      since they can change the meaning of a sentence.
-      
-      For example, "I have experience" vs "I do not have experience" are very 
-      different statements.
-      """
-      if (
-          token.is_stop
-          and token.lower_ not in self.NEGATION_WORDS
+      if remove_stop_words and token.is_punct:
+        continue
+
+      if self._should_remove_stop_word(
+          token=token,
+          remove_stop_words=remove_stop_words,
       ):
         continue
 
-      processed_token = self._get_processed_token(token)
+      processed_token = self._process_token(
+        token=token,
+        preserve_punctuation=not remove_stop_words,
+      )
 
       if processed_token:
         processed_tokens.append(processed_token)
 
-    processed_text = " ".join(processed_tokens)
+    if remove_stop_words:
+      # V3 is intentionally converted into a simple list of meaningful
+      # normalized terms.
+      return " ".join(processed_tokens)
 
-    if not processed_text:
-      raise ValueError(
-        "spaCy preprocessing removed all meaningful text"
-      )
+    # V2 retains punctuation while avoiding spaces before punctuation.
+    return self._join_tokens_with_punctuation(processed_tokens)
 
-    return processed_text
+  def _should_remove_stop_word(
+      self,
+      token: Token,
+      remove_stop_words: bool,
+  ) -> bool:
+    """
+    Determine whether a stop word should be removed.
+
+    Negation words are retained because removing them could reverse the
+    meaning of the source text.
+    """
+    if not remove_stop_words:
+      return False
+
+    if not token.is_stop:
+      return False
+
+    return token.lower_ not in self.NEGATION_WORDS
 
   @staticmethod
-  def _normalize_text(text: str) -> str:
+  def _process_token(
+      token: Token,
+      preserve_punctuation: bool,
+  ) -> str:
     """
-    Decode HTML entities and normalize equivalent Unicode characters.
+    Return the desired representation of one token.
     """
-    decoded_text = unescape(text)
+    if token.is_punct:
+      return token.text if preserve_punctuation else ""
 
-    return unicodedata.normalize(
-      "NFKC",
-      decoded_text,
-    ).strip()
-
-  @staticmethod
-  def _get_processed_token(token) -> str:
-    """
-    Return the normalized representation of one spaCy token.
-    """
+    # Preserve numbers exactly as they appeared.
     if token.like_num:
       return token.text.lower()
 
-    # A pronoun lemma may be represented as "-PRON-" by some pipelines.
-    # In that case, retain the original token text.
     lemma = token.lemma_.strip()
 
+    # Fall back to the original token if spaCy did not provide a useful
+    # lemma.
     if not lemma or lemma == "-PRON-":
       lemma = token.text
 
     return lemma.lower()
 
   @staticmethod
-  @lru_cache(maxsize=1)
-  def _load_spacy_model() -> Language:
+  def _join_tokens_with_punctuation(
+      tokens: list[str],
+  ) -> str:
     """
-    Load the spaCy pipeline once and reuse it for subsequent requests.
+    Join tokens while avoiding output such as 'report .'.
+    """
+    result = ""
 
-    Parser and named-entity recognition are not needed for V1
-    preprocessing, so they are disabled to reduce processing work.
+    for token in tokens:
+      if not result:
+        result = token
+      elif token in {".", ",", "!", "?", ";", ":", "%"}:
+        result += token
+      elif token in {"'", "’"}:
+        result += token
+      else:
+        result += f" {token}"
+
+    return result
+
+  @staticmethod
+  def _validate_result(text: str) -> str:
+    """
+    Reject preprocessing that removes all usable content.
+    """
+    result = text.strip()
+
+    if not result:
+      raise ValueError(
+        "spaCy preprocessing removed all meaningful text"
+      )
+
+    return result
+
+  @classmethod
+  def _process_with_spacy(
+      cls,
+      text: str,
+  ) -> Doc:
+    """
+    Process text through the cached spaCy pipeline.
+    """
+    return cls._load_spacy_model()(text)
+
+  @classmethod
+  @lru_cache(maxsize=1)
+  def _load_spacy_model(cls) -> Language:
+    """
+    Load and cache the spaCy model.
+
+    Named-entity recognition is unnecessary for these preprocessing
+    versions. The parser is retained because grammatical analysis can
+    contribute to accurate lemmatisation.
     """
     return spacy.load(
-      SpacyTextPreprocessor.SPACY_MODEL_NAME,
+      cls.SPACY_MODEL_NAME,
       disable=[
-        "parser",
         "ner",
       ],
     )

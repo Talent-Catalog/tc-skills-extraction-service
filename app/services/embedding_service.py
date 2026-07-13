@@ -13,9 +13,6 @@ from app.services.text_preprocessor import SpacyTextPreprocessor
 class EmbeddingService:
   """
   Generates embeddings using Sentence Transformers.
-
-  Depending on the configuration version, the original text may first be
-  processed by spaCy.
   """
 
   def __init__(
@@ -23,11 +20,10 @@ class EmbeddingService:
       text_preprocessor: SpacyTextPreprocessor | None = None,
   ) -> None:
     """
-    Create the embedding service.
+    Create the service with an optional injected preprocessor.
 
-    Args:
-        text_preprocessor: Optional preprocessor, primarily useful for
-            dependency injection in tests.
+    Injection makes configuration routing easy to test without loading
+    spaCy or SBERT.
     """
     self._text_preprocessor = (
         text_preprocessor or SpacyTextPreprocessor()
@@ -56,7 +52,7 @@ class EmbeddingService:
         ValueError: If the text is empty or the model produces an
             unexpected number of dimensions.
     """
-    if not text.strip():
+    if not text or not text.strip():
       raise ValueError("Text must not be empty")
 
     prepared_text = self.prepare_text(
@@ -66,7 +62,9 @@ class EmbeddingService:
       ),
     )
 
-    model = self._load_model(model_details.model_name)
+    model = self._load_model(
+      model_details.model_name,
+    )
 
     embedding = model.encode(
       prepared_text,
@@ -113,15 +111,29 @@ class EmbeddingService:
     ):
       return self._text_preprocessor.preprocess_v1(text)
 
+    if (
+        configuration_version
+        == EmbeddingConfigurationVersion.SPACY_PREPROCESSING_V2
+    ):
+      return self._text_preprocessor.preprocess_v2(text)
+
+    if (
+        configuration_version
+        == EmbeddingConfigurationVersion.SPACY_PREPROCESSING_V3
+    ):
+      return self._text_preprocessor.preprocess_v3(text)
+
     raise ValueError(
-      f"Unsupported embedding configuration version: "
+      "Unsupported embedding configuration version: "
       f"{configuration_version}"
     )
 
   @staticmethod
   @lru_cache(maxsize=4)
-  def _load_model(model_name: str) -> SentenceTransformer:
+  def _load_model(
+      model_name: str,
+  ) -> SentenceTransformer:
     """
-    Load and cache each Sentence Transformers model.
+    Load and cache each Sentence Transformer model.
     """
     return SentenceTransformer(model_name)
