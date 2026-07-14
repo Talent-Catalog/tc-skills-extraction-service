@@ -138,7 +138,7 @@ class EmbeddingService:
     )
 
     prepared_inputs: list[PreparedEmbeddingInput] = []
-    results_by_id: dict[int, EmbeddingResult] = {}
+    results_by_id: dict[str, EmbeddingResult] = {}
 
     for input_item in request.inputs:
       prepared_input, failure = self._prepare_input(
@@ -220,7 +220,7 @@ class EmbeddingService:
 
     except Exception as exception:
       logger.exception(
-        "Preprocessing failed for input ID %d.",
+        "Preprocessing failed for input ID %s.",
         input_item.id,
       )
 
@@ -359,7 +359,7 @@ class EmbeddingService:
 
     except Exception as exception:
       logger.exception(
-        "Embedding failed for input ID %d.",
+        "Embedding failed for input ID %s.",
         prepared_input.original.id,
       )
 
@@ -374,7 +374,7 @@ class EmbeddingService:
 
   def _build_success_or_failure(
       self,
-      input_id: int,
+      input_id: str,
       vector: np.ndarray | Sequence[float],
       expected_dimensions: int,
   ) -> EmbeddingResult:
@@ -449,7 +449,7 @@ class EmbeddingService:
 
   @staticmethod
   def _failure(
-      input_id: int,
+      input_id: str,
       code: EmbeddingErrorCode,
       message: str,
   ) -> EmbeddingResult:

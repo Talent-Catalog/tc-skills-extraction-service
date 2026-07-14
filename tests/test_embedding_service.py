@@ -174,11 +174,11 @@ def test_generates_multiple_embeddings_in_one_batch(
       model=model_details,
       inputs=[
         EmbeddingInput(
-          id=101,
+          id="101",
           text="First text",
         ),
         EmbeddingInput(
-          id=102,
+          id="102",
           text="Second text",
         ),
       ],
@@ -190,14 +190,14 @@ def test_generates_multiple_embeddings_in_one_batch(
   assert response.succeeded == 2
   assert response.failed == 0
 
-  assert response.results[0].id == 101
+  assert response.results[0].id == "101"
   assert response.results[0].embedding == [
     0.0,
     1.0,
     2.0,
   ]
 
-  assert response.results[1].id == 102
+  assert response.results[1].id == "102"
   assert response.results[1].embedding == [
     1.0,
     2.0,
@@ -226,15 +226,15 @@ def test_blank_text_is_an_item_failure(
       model=model_details,
       inputs=[
         EmbeddingInput(
-          id=101,
+          id="101",
           text="Valid text",
         ),
         EmbeddingInput(
-          id=102,
+          id="102",
           text=" ",
         ),
         EmbeddingInput(
-          id=103,
+          id="103",
           text="Other text",
         ),
       ],
@@ -247,7 +247,7 @@ def test_blank_text_is_an_item_failure(
 
   failed_result = response.results[1]
 
-  assert failed_result.id == 102
+  assert failed_result.id == "102"
   assert failed_result.embedding is None
   assert failed_result.error is not None
   assert (
@@ -284,11 +284,11 @@ def test_preprocessing_failure_does_not_stop_batch(
       model=model_details,
       inputs=[
         EmbeddingInput(
-          id=101,
+          id="101",
           text="Good text",
         ),
         EmbeddingInput(
-          id=102,
+          id="102",
           text="Broken text",
         ),
       ],
@@ -325,15 +325,15 @@ def test_failed_batch_is_retried_individually(
       model=model_details,
       inputs=[
         EmbeddingInput(
-          id=101,
+          id="101",
           text="Good text",
         ),
         EmbeddingInput(
-          id=102,
+          id="102",
           text="Bad text",
         ),
         EmbeddingInput(
-          id=103,
+          id="103",
           text="Other text",
         ),
       ],
@@ -391,7 +391,7 @@ def test_model_dimension_mismatch_fails_entire_batch(
         model=model_details,
         inputs=[
           EmbeddingInput(
-            id=101,
+            id="101",
             text="Some text",
           ),
         ],
