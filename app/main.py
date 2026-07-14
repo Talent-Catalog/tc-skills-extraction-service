@@ -107,6 +107,7 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
   # spaCy doesn't need an explicit teardown.
   # If you opened sockets/files, close them here.
   app_.state.skills_extractor = None
+  app_.state.embedding_service = None
   app_.state.ready = False
 
 app = FastAPI(
