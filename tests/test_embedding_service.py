@@ -61,7 +61,7 @@ class FakeEmbeddingModel:
     self._failing_texts = failing_texts or set()
     self.calls: list[list[str]] = []
 
-  def get_sentence_embedding_dimension(self) -> int:
+  def get_embedding_dimension(self) -> int:
     """
     Return the configured test dimensions.
     """
