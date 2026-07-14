@@ -39,21 +39,28 @@ In the parameters field, enter "app.main:app --log-config=log_conf.yaml"
 Select the Python interpreter that is the same as your project interpreter (the venv).
 
 """
+from __future__ import annotations
+
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, HTTPException
-from typing import List
+from typing import AsyncIterator
+
 import spacy
+from fastapi import FastAPI, Request
 from spacy.matcher import PhraseMatcher
 
-from app.embedding_models import GenerateEmbeddingResponse, \
-  GenerateEmbeddingRequest
-from app.models import SkillName, ExtractSkillsRequest
-from app.services.embedding_service import EmbeddingService
-from app.services.skills_extractor import SkillsExtractor
+from app.api.embedding_api import router as embedding_router
+from app.dependencies import get_extractor
+from app.models.models import ExtractSkillsRequest, SkillName
+from app.services.embedding_service import (
+  EmbeddingService,
+  SentenceTransformerModelProvider,
+)
 from app.services.skills_service import SkillsService
+from app.services.text_preprocessor import SpacyTextPreprocessor
+
 
 @asynccontextmanager
-async def lifespan(app_: FastAPI):
+async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
   """
   This runs once at startup up to the yield statement.
   :param app_: Reference to the FastAPI app
@@ -64,6 +71,17 @@ async def lifespan(app_: FastAPI):
   Globals are accessible through Request.app.state - whose values are set
   in this set-up function.
   """
+
+  """
+  Creates expensive application services once before requests are accepted.
+  """
+  app_.state.embedding_service = EmbeddingService(
+    model_provider=SentenceTransformerModelProvider(),
+    text_preprocessor=SpacyTextPreprocessor(),
+    encoder_batch_size=32,
+    normalize_embeddings=True,
+  )
+
   # Load heavy resources ONCE, without blocking the event loop.
   # asyncio.to_thread runs blocking calls in a threadpool.
   nlp = spacy.load("en_core_web_sm")
@@ -87,16 +105,19 @@ async def lifespan(app_: FastAPI):
 
   # spaCy doesn't need an explicit teardown.
   # If you opened sockets/files, close them here.
-  app.state.extractor = None # type: ignore[attr-defined] (disable checking, state is there only at runtime)
+  app_.state.extractor = None # type: ignore[attr-defined] (disable checking, state is there only at runtime)
   app_.state.ready = False # type: ignore[attr-defined] (disable checking, state is there only at runtime)
 
-app = FastAPI(title="Skills Extractor API", lifespan=lifespan)
+app = FastAPI(
+  title="Embedding Service",
+  lifespan=lifespan,
+)
 
-embedding_service = EmbeddingService()
+app.include_router(embedding_router)
 
-@app.post("/extract_skills", response_model=List[SkillName])
+@app.post("/extract_skills", response_model=list[SkillName])
 def extract_skills(
-    payload: ExtractSkillsRequest, request: Request,) -> List[SkillName]:
+    payload: ExtractSkillsRequest, request: Request,) -> list[SkillName]:
   """
   Extract skills from the given text
   :param payload: the text to extract skills from
@@ -106,33 +127,6 @@ def extract_skills(
   extractor = get_extractor(request)
   result = extractor.extract_skills(payload.text)
   return result
-
-@app.post(
-  "/generate_embedding",
-  response_model=GenerateEmbeddingResponse,
-)
-def generate_embedding(
-    payload: GenerateEmbeddingRequest,
-) -> GenerateEmbeddingResponse:
-  """
-  Generate an embedding from the supplied text.
-  The embedding generation is delegated to EmbeddingService so that the
-  same code can be tested directly without using the REST API.
-  """
-  try:
-    embedding = embedding_service.generate_embedding(
-      text=payload.text,
-      model_details=payload.model,
-    )
-    return GenerateEmbeddingResponse(
-      dimensions=len(embedding),
-      embedding=embedding,
-    )
-  except (ValueError, OSError) as error:
-    raise HTTPException(
-      status_code=400,
-      detail=str(error),
-    ) from error
 
 @app.get("/readyz")
 def readyz(request: Request):
@@ -145,7 +139,7 @@ def readyz(request: Request):
   return {"ready": ready}
 
 
-def build_matcher(nlp: spacy.language.Language, skills: List[str]) -> PhraseMatcher:
+def build_matcher(nlp: spacy.language.Language, skills: list[str]) -> PhraseMatcher:
   """
   The matcher only needs to be created once at start-up (20,000 skill
   # names - so only want to do once)
@@ -166,6 +160,3 @@ def build_matcher(nlp: spacy.language.Language, skills: List[str]) -> PhraseMatc
 
   return matcher
 
-
-def get_extractor(request: Request) -> SkillsExtractor:
-  return request.app.state.extractor  # created once in lifespan()

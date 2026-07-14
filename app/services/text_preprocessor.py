@@ -7,6 +7,8 @@ import spacy
 from spacy.language import Language
 from spacy.tokens import Doc, Token
 
+from app.models.embedding_models import EmbeddingConfigurationVersion
+
 
 class SpacyTextPreprocessor:
   """
@@ -26,6 +28,36 @@ class SpacyTextPreprocessor:
     "nor",
     "without",
   }
+
+  def preprocess(
+      self,
+      text: str,
+      configuration_version: EmbeddingConfigurationVersion,
+  ) -> str:
+    """
+    Apply the preprocessing associated with an embedding configuration.
+
+    The raw SBERT configuration performs no preprocessing. Each spaCy
+    configuration delegates to its corresponding versioned implementation.
+    """
+    match configuration_version:
+      case EmbeddingConfigurationVersion.SBERT_RAW_V1:
+        return text
+
+      case EmbeddingConfigurationVersion.SPACY_PREPROCESSING_V1:
+        return self.preprocess_v1(text)
+
+      case EmbeddingConfigurationVersion.SPACY_PREPROCESSING_V2:
+        return self.preprocess_v2(text)
+
+      case EmbeddingConfigurationVersion.SPACY_PREPROCESSING_V3:
+        return self.preprocess_v3(text)
+
+      case _:
+        raise ValueError(
+          "Unsupported embedding configuration version: "
+          f"{configuration_version}"
+        )
 
   def preprocess_v1(self, text: str) -> str:
     """
