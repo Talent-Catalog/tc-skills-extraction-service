@@ -96,8 +96,8 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
   matcher = build_matcher(nlp, skill_labels)
 
   # The extractor is configured with all the heavy resources.
-  app_.state.skills_extractor = SkillsExtractor(nlp=nlp, matcher=matcher) # type: ignore[attr-defined] (disable checking, state is there only at runtime)
-  app_.state.ready = True # type: ignore[attr-defined] (disable checking, state is there only at runtime)
+  app_.state.skills_extractor = SkillsExtractor(nlp=nlp, matcher=matcher)
+  app_.state.ready = True
 
   # Everything before the yield runs once at startup.
   # FastAPI won't start listening on the port until the pre-yield code is done.
@@ -106,8 +106,8 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
 
   # spaCy doesn't need an explicit teardown.
   # If you opened sockets/files, close them here.
-  app_.state.skills_extractor = None # type: ignore[attr-defined] (disable checking, state is there only at runtime)
-  app_.state.ready = False # type: ignore[attr-defined] (disable checking, state is there only at runtime)
+  app_.state.skills_extractor = None
+  app_.state.ready = False
 
 app = FastAPI(
   title="Embedding Service",
