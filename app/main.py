@@ -45,12 +45,12 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 import spacy
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from spacy.matcher import PhraseMatcher
 
 from app.api.embedding_api import router as embedding_router
-from app.dependencies import get_extractor
-from app.models.models import ExtractSkillsRequest, SkillName
+from app.api.health_api import router as health_router
+from app.api.skills_api import router as skills_router
 from app.services.embedding_service import (
   EmbeddingService,
   SentenceTransformerModelProvider,
@@ -114,29 +114,8 @@ app = FastAPI(
 )
 
 app.include_router(embedding_router)
-
-@app.post("/extract_skills", response_model=list[SkillName])
-def extract_skills(
-    payload: ExtractSkillsRequest, request: Request,) -> list[SkillName]:
-  """
-  Extract skills from the given text
-  :param payload: the text to extract skills from
-  :param request: the request object (which contains the app instance)
-  :return: a List of extracted skills
-  """
-  extractor = get_extractor(request)
-  result = extractor.extract_skills(payload.text)
-  return result
-
-@app.get("/readyz")
-def readyz(request: Request):
-  """
-  This is a commonly used liveness check endpoint.
-  :param request: contains the app instance where the state is stored
-  :return: a JSON response with the ready status
-  """
-  ready = bool(getattr(request.app.state, "ready", False))
-  return {"ready": ready}
+app.include_router(skills_router)
+app.include_router(health_router)
 
 
 def build_matcher(nlp: spacy.language.Language, skills: list[str]) -> PhraseMatcher:

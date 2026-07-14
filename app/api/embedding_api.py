@@ -22,7 +22,6 @@ router = APIRouter(
   ],
 )
 
-
 @router.post(
   "",
   response_model=GenerateEmbeddingsResponse,

@@ -11,5 +11,5 @@ def get_embedding_service(request: Request) -> EmbeddingService:
   return request.app.state.embedding_service
 
 
-def get_extractor(request: Request) -> SkillsExtractor:
-  return request.app.state.extractor  # created once in lifespan()
+def get_skills_extractor(request: Request) -> SkillsExtractor:
+  return request.app.state.skills_extractor  # created once in lifespan()

@@ -3,7 +3,7 @@ from spacy.matcher import PhraseMatcher
 from typing import List
 import logging
 
-from app.models.models import SkillName
+from app.models.skills_models import SkillName
 
 logger = logging.getLogger(__name__)
 
