@@ -48,18 +48,31 @@ def test_v2_lemmatises_words(
   V2 should reduce inflected words to their base forms.
   """
   result = preprocessor.preprocess_v2(
-    "Accountants managed accounts and prepared reports."
+    "Accountants managed accounts and they also prepared reports"
   )
 
-  assert "accountant" in result
-  assert "manage" in result
-  assert "account" in result
-  assert "prepare" in result
-  assert "report" in result
+  """
+  Demonstrate that the lemmatisation is working as expected.
+  """
+  doc = preprocessor._process_with_spacy(result)
+  for token in doc:
+    print(
+      token.text,
+      token.lemma_,
+      token.pos_,
+    )
 
-  assert "accountants" not in result
-  assert "managed" not in result
-  assert "prepared" not in result
+  tokens = result.split()
+
+  assert "accountant" in tokens
+  assert "manage" in tokens
+  assert "account" in tokens
+  assert "prepare" in tokens
+  assert "report" in tokens
+
+  assert "accountants" not in tokens
+  assert "managed" not in tokens
+  assert "prepared" not in tokens
 
 
 def test_v2_preserves_stop_words(

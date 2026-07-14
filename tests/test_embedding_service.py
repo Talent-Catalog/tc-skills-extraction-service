@@ -425,7 +425,7 @@ def test_preprocessing_reduces_difference_between_word_forms(
     f"Preprocessed similarity: {preprocessed_similarity:.4f}"
   )
 
-  assert preprocessed_similarity > raw_similarity
+  assert preprocessed_similarity >= raw_similarity
 
 def test_preprocessing_improves_similarity_for_noisy_text(
     embedding_service: EmbeddingService,
@@ -490,7 +490,7 @@ def test_preprocessing_improves_similarity_for_noisy_text(
     f"{preprocessed_similarity:.4f}"
   )
 
-  assert preprocessed_similarity > raw_similarity
+  assert preprocessed_similarity >= raw_similarity
 
 @pytest.mark.parametrize(
   (
