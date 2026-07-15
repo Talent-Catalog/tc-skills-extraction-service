@@ -51,6 +51,7 @@ from spacy.matcher import PhraseMatcher
 from app.api.embedding_api import router as embedding_router
 from app.api.health_api import router as health_router
 from app.api.skills_api import router as skills_router
+from app.dependencies import ApplicationServices
 from app.services.embedding_service import (
   EmbeddingService,
   SentenceTransformerModelProvider,
@@ -76,7 +77,7 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
   """
   Creates expensive application services once before requests are accepted.
   """
-  app_.state.embedding_service = EmbeddingService(
+  embedding_service = EmbeddingService(
     model_provider=SentenceTransformerModelProvider(),
     text_preprocessor=SpacyTextPreprocessor(),
     encoder_batch_size=32,
@@ -96,7 +97,13 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
   matcher = build_matcher(nlp, skill_labels)
 
   # The extractor is configured with all the heavy resources.
-  app_.state.skills_extractor = SkillsExtractor(nlp=nlp, matcher=matcher)
+  skills_extractor = SkillsExtractor(nlp=nlp, matcher=matcher)
+
+  # Store the services in the app state so that they can be accessed in the dependencies
+  app_.state.services = ApplicationServices(
+    embedding_service=embedding_service,
+    skills_extractor=skills_extractor)
+
   app_.state.ready = True
 
   # Everything before the yield runs once at startup.
