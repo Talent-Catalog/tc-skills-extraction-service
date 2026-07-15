@@ -53,11 +53,12 @@ class SpacyTextPreprocessor:
       case EmbeddingConfigurationVersion.SPACY_PREPROCESSING_V3:
         return self.preprocess_v3(text)
 
-      case _:
-        raise ValueError(
-          "Unsupported embedding configuration version: "
-          f"{configuration_version}"
-        )
+    # Fail explicitly if a new configuration is added but preprocessing
+    # support has not been implemented.
+    raise ValueError(
+      "Unsupported embedding configuration version: "
+      f"{configuration_version}"
+    )
 
   def preprocess_v1(self, text: str) -> str:
     """
