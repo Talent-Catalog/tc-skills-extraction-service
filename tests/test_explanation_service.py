@@ -7,8 +7,8 @@ import httpx
 import pytest
 
 from app.models.explanation_models import (
+  CandidateExperience,
   GenerateExplanationRequest,
-  MatchingExperienceEvidence,
 )
 from app.services.explanation_service import (
   ExplanationGenerationError,
@@ -42,18 +42,15 @@ class FakeLlmClient(LlmClient):
 
 @pytest.fixture
 def explanation_request() -> GenerateExplanationRequest:
-  """Return valid ranking evidence shared by service tests."""
+  """Return candidate and opportunity text shared by service tests."""
   return GenerateExplanationRequest(
     candidate_id="candidate-1",
-    rank=2,
-    candidate_score=0.78,
     opportunity_description="Seeking an accountant.",
-    matching_experiences=[
-      MatchingExperienceEvidence(
+    experiences=[
+      CandidateExperience(
         experience_id="experience-1",
         job_title="Accountant",
         description="Prepared monthly financial reports.",
-        similarity=0.82,
       )
     ],
   )
@@ -65,15 +62,14 @@ def test_validates_successful_generated_json(
   llm_client = FakeLlmClient(
     """{
       "candidate_id": "candidate-1",
-      "summary": "The supplied experience aligns semantically.",
-      "ranking_basis": "The supplied score and experience support rank 2.",
+      "summary": "The supplied experience includes relevant work.",
       "experience_explanations": [
         {
           "experience_id": "experience-1",
           "explanation": "Financial reporting relates to the opportunity."
         }
       ],
-      "limitations": ["Similarity does not prove every requirement is met."]
+      "limitations": ["The supplied text does not cover every requirement."]
     }"""
   )
 
@@ -85,7 +81,10 @@ def test_validates_successful_generated_json(
   assert response.experience_explanations[0].experience_id == "experience-1"
   assert "candidate-1" in llm_client.user_prompt
   assert "Do not invent" in llm_client.system_prompt
-  assert "semantic alignment" in llm_client.system_prompt
+  assert "directly" in llm_client.system_prompt
+  assert "search rankings" in llm_client.system_prompt
+  assert "candidate_score" not in llm_client.user_prompt
+  assert "similarity" not in llm_client.user_prompt
 
 
 def test_invalid_generated_json_raises_error(
@@ -112,7 +111,6 @@ def test_generated_candidate_id_must_match_request(
   content = """{
     "candidate_id": "invented-candidate",
     "summary": "Summary",
-    "ranking_basis": "Basis",
     "experience_explanations": [
       {"experience_id": "experience-1", "explanation": "Explanation"}
     ],
@@ -134,7 +132,6 @@ def test_generated_experience_ids_must_match_request(
   content = """{
     "candidate_id": "candidate-1",
     "summary": "Summary",
-    "ranking_basis": "Basis",
     "experience_explanations": [
       {"experience_id": "invented-experience", "explanation": "Explanation"}
     ],

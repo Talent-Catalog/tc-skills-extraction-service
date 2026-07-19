@@ -18,25 +18,28 @@ class ExplanationGenerationError(RuntimeError):
 
 class ExplanationService:
   """
-  Generates explanations grounded only in supplied ranking evidence.
+  Compares candidate experience text with an opportunity description.
+
+  Explanations are grounded only in the supplied texts and do not use hybrid
+  search ranks, scores, or vector similarities.
 
   The separately hosted Qwen inference process owns model resources, keeping
   this API process lightweight and independently scalable.
   """
 
   SYSTEM_PROMPT = """
-You explain an existing candidate ranking using only the evidence supplied by
-the user. Do not calculate, alter, or second-guess the rank or candidate score.
-Do not invent skills, qualifications, dates, experience, proficiency, or any
-other candidate facts. Vector similarity indicates semantic alignment, not
-proof that the candidate meets all opportunity requirements. State relevant
-limitations or missing evidence clearly.
+Compare the supplied candidate experience text directly with the supplied
+opportunity description. Base every statement only on those texts. Do not use,
+infer, or mention search rankings, scores, vector similarity, or other matching
+engine output. Do not invent skills, qualifications, dates, experience,
+proficiency, opportunity requirements, or any other facts. Distinguish between
+requirements supported by the experience text and requirements for which the
+supplied text provides no evidence. State relevant limitations clearly.
 
 Return JSON only, without Markdown fences, matching this exact structure:
 {
   "candidate_id": "string",
   "summary": "string",
-  "ranking_basis": "string",
   "experience_explanations": [
     {"experience_id": "string", "explanation": "string"}
   ],
@@ -52,9 +55,10 @@ Preserve the supplied candidate_id and experience_id values exactly.
       self,
       request: GenerateExplanationRequest,
   ) -> GenerateExplanationResponse:
-    """Explain supplied ranking evidence and validate the generated JSON."""
+    """Compare the supplied texts and validate the generated explanation."""
     user_prompt = (
-      "Explain this supplied ranking evidence only:\n"
+      "Compare these candidate experiences with the opportunity using only "
+      "the supplied text:\n"
       f"{request.model_dump_json()}"
     )
 
@@ -73,7 +77,7 @@ Preserve the supplied candidate_id and experience_id values exactly.
 
     expected_experience_ids = Counter(
       experience.experience_id
-      for experience in request.matching_experiences
+      for experience in request.experiences
     )
     generated_experience_ids = Counter(
       explanation.experience_id

@@ -1,30 +1,28 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
-class MatchingExperienceEvidence(BaseModel):
-  """Contains supplied evidence for one semantically matching experience."""
+class CandidateExperience(BaseModel):
+  """Contains candidate experience text to compare with an opportunity."""
 
   experience_id: str
   job_title: str | None = None
   description: str
-  similarity: float = Field(ge=-1.0, le=1.0)
 
 
 class GenerateExplanationRequest(BaseModel):
   """
-  Requests an explanation of an existing candidate ranking.
+  Requests a comparison of candidate experience and an opportunity.
 
-  The LLM explains only the supplied ranking evidence. It does not calculate
-  or change the candidate's rank or score.
+  The LLM bases its explanation only on the supplied opportunity description
+  and candidate experience text. Search ranks, scores, and similarities are
+  not inputs to the explanation.
   """
 
   candidate_id: str
-  rank: int = Field(ge=1)
-  candidate_score: float = Field(ge=-1.0, le=1.0)
   opportunity_description: str
-  matching_experiences: list[MatchingExperienceEvidence]
+  experiences: list[CandidateExperience]
 
 
 class ExperienceExplanation(BaseModel):
@@ -35,10 +33,9 @@ class ExperienceExplanation(BaseModel):
 
 
 class GenerateExplanationResponse(BaseModel):
-  """Explains supplied ranking evidence without recalculating the ranking."""
+  """Explains a text-only comparison with the supplied opportunity."""
 
   candidate_id: str
   summary: str
-  ranking_basis: str
   experience_explanations: list[ExperienceExplanation]
   limitations: list[str]

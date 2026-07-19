@@ -30,7 +30,7 @@ router = APIRouter(
   "",
   response_model=GenerateExplanationResponse,
   status_code=status.HTTP_200_OK,
-  summary="Explain a candidate ranking",
+  summary="Compare candidate experience with an opportunity",
 )
 def generate_explanation(
     request: GenerateExplanationRequest,
@@ -38,7 +38,7 @@ def generate_explanation(
       get_explanation_service
     ),
 ) -> GenerateExplanationResponse:
-  """Explain a ranking using only the evidence supplied in the request."""
+  """Explain a direct comparison using only the supplied text."""
   try:
     return explanation_service.generate_explanation(request)
   except LlmServiceUnavailableError as exception:

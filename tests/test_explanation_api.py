@@ -16,15 +16,12 @@ from app.services.llm_client import LlmServiceUnavailableError
 
 VALID_REQUEST = {
   "candidate_id": "candidate-1",
-  "rank": 1,
-  "candidate_score": 0.9,
   "opportunity_description": "Seeking an accountant.",
-  "matching_experiences": [
+  "experiences": [
     {
       "experience_id": "experience-1",
       "job_title": "Accountant",
       "description": "Prepared financial reports.",
-      "similarity": 0.8,
     }
   ],
 }
@@ -71,14 +68,13 @@ def test_post_explanations_returns_generated_explanation() -> None:
   response_model = GenerateExplanationResponse(
     candidate_id="candidate-1",
     summary="Relevant supplied experience.",
-    ranking_basis="The supplied evidence supports the existing rank.",
     experience_explanations=[
       ExperienceExplanation(
         experience_id="experience-1",
         explanation="The description mentions financial reporting.",
       )
     ],
-    limitations=["Semantic similarity is not proof of all requirements."],
+    limitations=["The supplied text does not address every requirement."],
   )
 
   response = post_with_service(FakeExplanationService(response_model))
