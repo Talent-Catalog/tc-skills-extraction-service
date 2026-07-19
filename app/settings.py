@@ -8,6 +8,7 @@ class Settings(BaseSettings):
 
   llm_base_url: str = "http://localhost:8001/v1"
   llm_model_name: str = "Qwen/Qwen3-8B"
+  llm_api_key: str | None = None
   llm_request_timeout_seconds: float = Field(default=60.0, gt=0)
 
   model_config = SettingsConfigDict(env_file=str(Path(__file__).resolve().parent.parent / ".env"))

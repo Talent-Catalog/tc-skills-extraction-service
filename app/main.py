@@ -115,6 +115,7 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
     model_name=settings.llm_model_name,
     timeout=settings.llm_request_timeout_seconds,
     http_client=llm_http_client,
+    api_key=settings.llm_api_key,
   )
   explanation_service = ExplanationService(llm_client)
 
