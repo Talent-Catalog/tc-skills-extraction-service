@@ -1,5 +1,5 @@
 import requests
-from app.models import SkillName
+from app.models.skills_models import SkillName
 from app.settings import settings
 from typing import List
 

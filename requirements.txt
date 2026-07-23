@@ -2,3 +2,7 @@ fastapi[standard]==0.139.0
 spacy==3.8.14
 pydantic==2.13.4
 pydantic-settings==2.14.2
+pytest
+sentence-transformers
+numpy
+
