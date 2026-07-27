@@ -11,7 +11,7 @@ class CandidateExperience(BaseModel):
   description: str
 
 
-class GenerateExplanationRequest(BaseModel):
+class ExplanationRequest(BaseModel):
   """
   Requests a comparison of candidate experience and an opportunity.
 
@@ -32,7 +32,7 @@ class ExperienceExplanation(BaseModel):
   explanation: str
 
 
-class GenerateExplanationResponse(BaseModel):
+class ExplanationResponse(BaseModel):
   """Explains a text-only comparison with the supplied opportunity."""
 
   candidate_id: str

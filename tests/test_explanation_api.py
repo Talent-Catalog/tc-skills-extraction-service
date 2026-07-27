@@ -7,8 +7,8 @@ from app.dependencies import get_explanation_service
 from app.main import app
 from app.models.explanation_models import (
   ExperienceExplanation,
-  GenerateExplanationRequest,
-  GenerateExplanationResponse,
+  ExplanationRequest,
+  ExplanationResponse,
 )
 from app.services.explanation_service import ExplanationGenerationError
 from app.services.llm_client import LlmServiceUnavailableError
@@ -32,7 +32,7 @@ class FakeExplanationService:
 
   def __init__(
       self,
-      result: GenerateExplanationResponse | None = None,
+      result: ExplanationResponse | None = None,
       error: Exception | None = None,
   ) -> None:
     self._result = result
@@ -40,8 +40,8 @@ class FakeExplanationService:
 
   def generate_explanation(
       self,
-      request: GenerateExplanationRequest,
-  ) -> GenerateExplanationResponse:
+      request: ExplanationRequest,
+  ) -> ExplanationResponse:
     if self._error is not None:
       raise self._error
 
@@ -65,7 +65,7 @@ def post_with_service(
 
 
 def test_post_explanations_returns_generated_explanation() -> None:
-  response_model = GenerateExplanationResponse(
+  response_model = ExplanationResponse(
     candidate_id="candidate-1",
     summary="Relevant supplied experience.",
     experience_explanations=[

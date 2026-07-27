@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.dependencies import get_explanation_service
 from app.models.explanation_models import (
-  GenerateExplanationRequest,
-  GenerateExplanationResponse,
+  ExplanationRequest,
+  ExplanationResponse,
 )
 from app.services.explanation_service import (
   ExplanationGenerationError,
@@ -28,16 +28,16 @@ router = APIRouter(
 
 @router.post(
   "",
-  response_model=GenerateExplanationResponse,
+  response_model=ExplanationResponse,
   status_code=status.HTTP_200_OK,
   summary="Compare candidate experience with an opportunity",
 )
 def generate_explanation(
-    request: GenerateExplanationRequest,
+    request: ExplanationRequest,
     explanation_service: ExplanationService = Depends(
       get_explanation_service
     ),
-) -> GenerateExplanationResponse:
+) -> ExplanationResponse:
   """Explain a direct comparison using only the supplied text."""
   try:
     return explanation_service.generate_explanation(request)

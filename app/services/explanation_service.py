@@ -6,8 +6,8 @@ import json
 from pydantic import ValidationError
 
 from app.models.explanation_models import (
-  GenerateExplanationRequest,
-  GenerateExplanationResponse,
+  ExplanationRequest,
+  ExplanationResponse,
 )
 from app.services.llm_client import LlmClient
 
@@ -53,8 +53,8 @@ Preserve the supplied candidate_id and experience_id values exactly.
 
   def generate_explanation(
       self,
-      request: GenerateExplanationRequest,
-  ) -> GenerateExplanationResponse:
+      request: ExplanationRequest,
+  ) -> ExplanationResponse:
     """Compare the supplied texts and validate the generated explanation."""
     user_prompt = (
       "Compare these candidate experiences with the opportunity using only "
@@ -69,7 +69,7 @@ Preserve the supplied candidate_id and experience_id values exactly.
 
     try:
       parsed = json.loads(content)
-      response = GenerateExplanationResponse.model_validate(parsed)
+      response = ExplanationResponse.model_validate(parsed)
     except (json.JSONDecodeError, ValidationError, TypeError) as exception:
       raise ExplanationGenerationError(
         "The LLM generated an invalid explanation response"

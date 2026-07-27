@@ -8,7 +8,7 @@ import pytest
 
 from app.models.explanation_models import (
   CandidateExperience,
-  GenerateExplanationRequest,
+  ExplanationRequest,
 )
 from app.services.explanation_service import (
   ExplanationGenerationError,
@@ -41,9 +41,9 @@ class FakeLlmClient(LlmClient):
 
 
 @pytest.fixture
-def explanation_request() -> GenerateExplanationRequest:
+def explanation_request() -> ExplanationRequest:
   """Return candidate and opportunity text shared by service tests."""
-  return GenerateExplanationRequest(
+  return ExplanationRequest(
     candidate_id="candidate-1",
     opportunity_description="Seeking an accountant.",
     experiences=[
@@ -57,7 +57,7 @@ def explanation_request() -> GenerateExplanationRequest:
 
 
 def test_validates_successful_generated_json(
-    explanation_request: GenerateExplanationRequest,
+    explanation_request: ExplanationRequest,
 ) -> None:
   llm_client = FakeLlmClient(
     """{
@@ -88,7 +88,7 @@ def test_validates_successful_generated_json(
 
 
 def test_invalid_generated_json_raises_error(
-    explanation_request: GenerateExplanationRequest,
+    explanation_request: ExplanationRequest,
 ) -> None:
   with pytest.raises(ExplanationGenerationError):
     ExplanationService(
@@ -97,7 +97,7 @@ def test_invalid_generated_json_raises_error(
 
 
 def test_invalid_generated_schema_raises_error(
-    explanation_request: GenerateExplanationRequest,
+    explanation_request: ExplanationRequest,
 ) -> None:
   with pytest.raises(ExplanationGenerationError):
     ExplanationService(
@@ -106,7 +106,7 @@ def test_invalid_generated_schema_raises_error(
 
 
 def test_generated_candidate_id_must_match_request(
-    explanation_request: GenerateExplanationRequest,
+    explanation_request: ExplanationRequest,
 ) -> None:
   content = """{
     "candidate_id": "invented-candidate",
@@ -127,7 +127,7 @@ def test_generated_candidate_id_must_match_request(
 
 
 def test_generated_experience_ids_must_match_request(
-    explanation_request: GenerateExplanationRequest,
+    explanation_request: ExplanationRequest,
 ) -> None:
   content = """{
     "candidate_id": "candidate-1",
