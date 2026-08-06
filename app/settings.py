@@ -3,6 +3,8 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import AnyHttpUrl, Field
 
+# Settings for the application. These are loaded from environment variables or
+# a .env file.
 class Settings(BaseSettings):
   SKILLS_BASE_URL: AnyHttpUrl
 

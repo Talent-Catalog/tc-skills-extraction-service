@@ -104,7 +104,9 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
   # The extractor is configured with all the heavy resources.
   skills_extractor = SkillsExtractor(nlp=nlp, matcher=matcher)
 
-  # SKILLS_BASE_URL is populated by BaseSettings from the environment.
+  # SKILLS_BASE_URL is populated by Settings from the environment variables or
+  # .env file. It is used by SkillsService to retrieve the skills from the TC server.
+
   # noinspection PyArgumentList
   settings = Settings()
   # Qwen runs behind a separate OpenAI-compatible inference server so model
