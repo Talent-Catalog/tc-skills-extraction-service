@@ -7,7 +7,7 @@ from app.models.embedding_models import (
   EmbeddingErrorCode,
   EmbeddingInput,
   EmbeddingModelDetails,
-  GenerateEmbeddingsRequest, EmbeddingConfigurationVersion,
+  EmbeddingsRequest, EmbeddingConfigurationVersion,
 )
 from app.services.embedding_service import (
   EmbeddingModelConfigurationError,
@@ -170,7 +170,7 @@ def test_generates_multiple_embeddings_in_one_batch(
   service = create_service(model)
 
   response = service.generate_embeddings(
-    GenerateEmbeddingsRequest(
+    EmbeddingsRequest(
       model=model_details,
       inputs=[
         EmbeddingInput(
@@ -222,7 +222,7 @@ def test_blank_text_is_an_item_failure(
   service = create_service(model)
 
   response = service.generate_embeddings(
-    GenerateEmbeddingsRequest(
+    EmbeddingsRequest(
       model=model_details,
       inputs=[
         EmbeddingInput(
@@ -280,7 +280,7 @@ def test_preprocessing_failure_does_not_stop_batch(
   )
 
   response = service.generate_embeddings(
-    GenerateEmbeddingsRequest(
+    EmbeddingsRequest(
       model=model_details,
       inputs=[
         EmbeddingInput(
@@ -321,7 +321,7 @@ def test_failed_batch_is_retried_individually(
   service = create_service(model)
 
   response = service.generate_embeddings(
-    GenerateEmbeddingsRequest(
+    EmbeddingsRequest(
       model=model_details,
       inputs=[
         EmbeddingInput(
@@ -387,7 +387,7 @@ def test_model_dimension_mismatch_fails_entire_batch(
       match="produces 4 dimensions",
   ):
     service.generate_embeddings(
-      GenerateEmbeddingsRequest(
+      EmbeddingsRequest(
         model=model_details,
         inputs=[
           EmbeddingInput(

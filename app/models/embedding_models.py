@@ -66,7 +66,7 @@ class EmbeddingInput(BaseModel):
   )
 
 
-class GenerateEmbeddingsRequest(BaseModel):
+class EmbeddingsRequest(BaseModel):
   """
   Requests embeddings for multiple inputs using one fixed model
   configuration.
@@ -80,7 +80,7 @@ class GenerateEmbeddingsRequest(BaseModel):
   )
 
   @model_validator(mode="after")
-  def validate_unique_ids(self) -> GenerateEmbeddingsRequest:
+  def validate_unique_ids(self) -> EmbeddingsRequest:
     """
     Reject duplicate IDs because each result must map unambiguously back to
     one database record.
@@ -165,7 +165,7 @@ class EmbeddingResult(BaseModel):
 
     return self
 
-class GenerateEmbeddingsResponse(BaseModel):
+class EmbeddingsResponse(BaseModel):
   """
   Reports the model used and one result for every requested input.
   """
@@ -179,7 +179,7 @@ class GenerateEmbeddingsResponse(BaseModel):
   results: list[EmbeddingResult]
 
   @model_validator(mode="after")
-  def validate_counts(self) -> GenerateEmbeddingsResponse:
+  def validate_counts(self) -> EmbeddingsResponse:
     """
     Ensure that the summary counts agree with the item-level results.
     """

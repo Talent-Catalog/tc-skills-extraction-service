@@ -44,11 +44,13 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
+import httpx
 import spacy
 from fastapi import FastAPI
 from spacy.matcher import PhraseMatcher
 
 from app.api.embedding_api import router as embedding_router
+from app.api.explanation_api import router as explanation_router
 from app.api.health_api import router as health_router
 from app.api.skills_api import router as skills_router
 from app.dependencies import ApplicationServices
@@ -56,9 +58,12 @@ from app.services.embedding_service import (
   EmbeddingService,
   SentenceTransformerModelProvider,
 )
+from app.services.explanation_service import ExplanationService
+from app.services.llm_client import LlmClient
 from app.services.skills_service import SkillsService
 from app.services.skills_extractor import SkillsExtractor
 from app.services.text_preprocessor import SpacyTextPreprocessor
+from app.settings import Settings
 
 
 @asynccontextmanager
@@ -99,30 +104,52 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
   # The extractor is configured with all the heavy resources.
   skills_extractor = SkillsExtractor(nlp=nlp, matcher=matcher)
 
+  # SKILLS_BASE_URL is populated by Settings from the environment variables or
+  # .env file. It is used by SkillsService to retrieve the skills from the TC server.
+
+  # noinspection PyArgumentList
+  settings = Settings()
+  # Qwen runs behind a separate OpenAI-compatible inference server so model
+  # resources are not loaded into this FastAPI process.
+  llm_http_client = httpx.Client()
+  llm_client = LlmClient(
+    base_url=settings.llm_base_url,
+    model_name=settings.llm_model_name,
+    timeout=settings.llm_request_timeout_seconds,
+    http_client=llm_http_client,
+    api_key=settings.llm_api_key,
+  )
+  explanation_service = ExplanationService(llm_client)
+
   # Store the services in the app state so that they can be accessed in the dependencies
   app_.state.services = ApplicationServices(
     embedding_service=embedding_service,
-    skills_extractor=skills_extractor)
+    skills_extractor=skills_extractor,
+    explanation_service=explanation_service,
+  )
 
   app_.state.ready = True
 
   # Everything before the yield runs once at startup.
   # FastAPI won't start listening on the port until the pre-yield code is done.
-  yield
-  # Everything from here runs once at shutdown.
-
-  # spaCy doesn't need an explicit teardown.
-  # If you opened sockets/files, close them here.
-  app_.state.skills_extractor = None
-  app_.state.embedding_service = None
-  app_.state.ready = False
+  try:
+    yield
+  finally:
+    # Everything from here runs once at shutdown.
+    try:
+      llm_http_client.close()
+    finally:
+      # spaCy doesn't need an explicit teardown.
+      app_.state.services = None
+      app_.state.ready = False
 
 app = FastAPI(
-  title="Embedding Service",
+  title="Talent Catalog AI Service",
   lifespan=lifespan,
 )
 
 app.include_router(embedding_router)
+app.include_router(explanation_router)
 app.include_router(skills_router)
 app.include_router(health_router)
 
@@ -147,4 +174,3 @@ def build_matcher(nlp: spacy.language.Language, skills: list[str]) -> PhraseMatc
   matcher.add("SKILL", patterns)
 
   return matcher
-
