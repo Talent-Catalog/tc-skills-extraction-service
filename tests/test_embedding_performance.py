@@ -4,6 +4,7 @@ import pytest
 
 from app.models.embedding_models import (
   EmbeddingInput,
+  EmbeddingInputType,
   EmbeddingModelDetails,
   EmbeddingsRequest, EmbeddingConfigurationVersion,
 )
@@ -74,12 +75,14 @@ def test_embeddings_per_second(
 
   request = EmbeddingsRequest(
     model=real_embedding_model_details,
+    type=EmbeddingInputType.DOCUMENT,
     inputs=inputs,
   )
 
   # Warm up the model and ensure it has already been loaded before timing.
   warm_up_request = EmbeddingsRequest(
     model=real_embedding_model_details,
+    type=EmbeddingInputType.DOCUMENT,
     inputs=inputs[:10],
   )
 
