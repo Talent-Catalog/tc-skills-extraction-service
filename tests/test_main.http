@@ -9,8 +9,67 @@ Content-Type: application/json
 
 ###
 
+POST https://test.skills.tctalent.org/extract_skills
+Content-Type: application/json
+
+{
+  "text": "John is a Java and Typescript programmer who knows Spring Boot a bit"
+}
+
+###
+
 GET http://127.0.0.1:8000/readyz
 Accept: application/json
+
+###
+
+POST http://localhost:8000/embeddings
+Content-Type: application/json
+
+{
+  "model": {
+    "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+    "configuration_version": "SPACY_PREPROCESSING_V3",
+    "dimensions": 384
+  },
+  "type": "DOCUMENT",
+  "inputs": [
+    {
+      "id": "exp-1",
+      "text": "Built and maintained Python microservices on AWS (Lambda, ECS). Mentored two junior engineers."
+    },
+    {
+      "id": "exp-2",
+      "context": "Data Analyst",
+      "text": "Wrote SQL reports and Excel dashboards for sales team."
+    }
+  ]
+}
+
+###
+
+POST https://test.skills.tctalent.org/embeddings
+Content-Type: application/json
+
+{
+  "model": {
+    "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+    "configuration_version": "SPACY_PREPROCESSING_V3",
+    "dimensions": 384
+  },
+  "type": "DOCUMENT",
+  "inputs": [
+    {
+      "id": "exp-1",
+      "text": "Built and maintained Python microservices on AWS (Lambda, ECS). Mentored two junior engineers."
+    },
+    {
+      "id": "exp-2",
+      "context": "Data Analyst",
+      "text": "Wrote SQL reports and Excel dashboards for sales team."
+    }
+  ]
+}
 
 ###
 

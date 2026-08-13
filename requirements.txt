@@ -4,5 +4,33 @@ pydantic==2.13.4
 pydantic-settings==2.14.2
 httpx==0.28.1
 pytest
-sentence-transformers
-numpy
+numpy==2.5.1
+
+# sentence-transformers generates the embeddings for the /embeddings endpoint.
+# It is pinned (like everything else here) because an earlier unpinned install
+# silently picked up new sentence-transformers/torch releases between builds,
+# which changed the deployed container's memory footprint enough to make it
+# fail to start on its Fargate task (OOM on startup -> ECS deployment rollback).
+sentence-transformers==5.7.0
+
+# sentence-transformers runs its models on top of PyTorch (torch): torch is the
+# ML framework that provides tensor math and executes a model's layers to turn
+# input text into an embedding vector. It is not used directly by our code, but
+# it is the biggest dependency in this file by far.
+#
+# By default "pip install torch" resolves to PyPI (pypi.org, the standard
+# public package index pip downloads from), which serves a build of torch
+# bundled with the full NVIDIA CUDA runtime - useful for GPU machines, but dead
+# weight on our GPU-less Fargate tasks. PyTorch publishes a separate, much
+# smaller CPU-only build under its own package index instead of as a separate
+# PyPI package, identified by the "+cpu" local version suffix (e.g. 2.8.0+cpu).
+#
+# --extra-index-url adds that index alongside PyPI (rather than replacing it,
+# which is what --index-url would do and would break every other package
+# above, since PyTorch's index only hosts torch/torchvision/torchaudio).
+# Pinning the exact "+cpu" version is what makes pip fetch the CPU build
+# instead of PyPI's default CUDA build: PyPI has no package matching that
+# literal version string, so there's no ambiguity about which index it must
+# come from.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.8.0+cpu
