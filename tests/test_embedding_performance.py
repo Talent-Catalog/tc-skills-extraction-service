@@ -5,7 +5,7 @@ import pytest
 from app.models.embedding_models import (
   EmbeddingInput,
   EmbeddingModelDetails,
-  GenerateEmbeddingsRequest, EmbeddingConfigurationVersion,
+  EmbeddingsRequest, EmbeddingConfigurationVersion,
 )
 from app.services.embedding_service import EmbeddingService, \
   SentenceTransformerModelProvider
@@ -72,13 +72,13 @@ def test_embeddings_per_second(
     for index in range(number_of_inputs)
   ]
 
-  request = GenerateEmbeddingsRequest(
+  request = EmbeddingsRequest(
     model=real_embedding_model_details,
     inputs=inputs,
   )
 
   # Warm up the model and ensure it has already been loaded before timing.
-  warm_up_request = GenerateEmbeddingsRequest(
+  warm_up_request = EmbeddingsRequest(
     model=real_embedding_model_details,
     inputs=inputs[:10],
   )

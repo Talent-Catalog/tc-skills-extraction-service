@@ -13,8 +13,8 @@ from app.models.embedding_models import (
   EmbeddingInput,
   EmbeddingModelDetails,
   EmbeddingResult,
-  GenerateEmbeddingsRequest,
-  GenerateEmbeddingsResponse,
+  EmbeddingsRequest,
+  EmbeddingsResponse,
 )
 from app.services.text_preprocessor import SpacyTextPreprocessor
 
@@ -123,8 +123,8 @@ class EmbeddingService:
 
   def generate_embeddings(
       self,
-      request: GenerateEmbeddingsRequest,
-  ) -> GenerateEmbeddingsResponse:
+      request: EmbeddingsRequest,
+  ) -> EmbeddingsResponse:
     """
     Generate one item-level outcome for every input in the request.
     """
@@ -184,7 +184,7 @@ class EmbeddingService:
       failed,
     )
 
-    return GenerateEmbeddingsResponse(
+    return EmbeddingsResponse(
       model=request.model,
       requested=len(request.inputs),
       succeeded=succeeded,

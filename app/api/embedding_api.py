@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.dependencies import get_embedding_service
 from app.models.embedding_models import (
-  GenerateEmbeddingsRequest,
-  GenerateEmbeddingsResponse,
+  EmbeddingsRequest,
+  EmbeddingsResponse,
 )
 from app.services.embedding_service import (
   EmbeddingModelConfigurationError,
@@ -24,16 +24,16 @@ router = APIRouter(
 
 @router.post(
   "",
-  response_model=GenerateEmbeddingsResponse,
+  response_model=EmbeddingsResponse,
   status_code=status.HTTP_200_OK,
   summary="Generate multiple embeddings",
 )
 def generate_embeddings(
-    request: GenerateEmbeddingsRequest,
+    request: EmbeddingsRequest,
     embedding_service: EmbeddingService = Depends(
       get_embedding_service
     ),
-) -> GenerateEmbeddingsResponse:
+) -> EmbeddingsResponse:
   """
   Generate multiple embeddings using one fixed model configuration.
 
