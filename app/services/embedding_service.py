@@ -34,13 +34,13 @@ class EmbeddingModelConfigurationError(RuntimeError):
 
 
 @dataclass(frozen=True)
-class PreparedEmbeddingInput:
+class PreprocessedEmbeddingInput:
   """
   Holds one input after successful validation and preprocessing.
   """
 
   original: EmbeddingInput
-  prepared_text: str
+  preprocessed_text: str
 
 
 class SentenceTransformerModelProvider:
@@ -137,25 +137,25 @@ class EmbeddingService:
       model_details=request.model,
     )
 
-    prepared_inputs: list[PreparedEmbeddingInput] = []
+    preprocessed_inputs: list[PreprocessedEmbeddingInput] = []
     results_by_id: dict[str, EmbeddingResult] = {}
 
     for input_item in request.inputs:
-      prepared_input, failure = self._prepare_input(
+      preprocessed_input, failure = self._prepare_input(
         model_details=request.model,
         input_item=input_item,
       )
 
       if failure is not None:
         results_by_id[input_item.id] = failure
-      elif prepared_input is not None:
-        prepared_inputs.append(prepared_input)
+      elif preprocessed_input is not None:
+        preprocessed_inputs.append(preprocessed_input)
 
-    if prepared_inputs:
-      generated_results = self._encode_prepared_inputs(
+    if preprocessed_inputs:
+      generated_results = self._encode_preprocessed_inputs(
         model=model,
         model_details=request.model,
-        prepared_inputs=prepared_inputs,
+        preprocessed_inputs=preprocessed_inputs,
       )
 
       for generated_result in generated_results:
@@ -197,7 +197,7 @@ class EmbeddingService:
       model_details: EmbeddingModelDetails,
       input_item: EmbeddingInput,
   ) -> tuple[
-    PreparedEmbeddingInput | None,
+    PreprocessedEmbeddingInput | None,
     EmbeddingResult | None,
   ]:
     """
@@ -211,7 +211,7 @@ class EmbeddingService:
       )
 
     try:
-      prepared_text = self._text_preprocessor.preprocess(
+      preprocessed_text = self._text_preprocessor.preprocess(
         text=input_item.text,
         configuration_version=(
           model_details.configuration_version
@@ -233,7 +233,7 @@ class EmbeddingService:
         ),
       )
 
-    if not prepared_text or not prepared_text.strip():
+    if not preprocessed_text or not preprocessed_text.strip():
       return None, self._failure(
         input_id=input_item.id,
         code=EmbeddingErrorCode.INVALID_TEXT,
@@ -241,18 +241,18 @@ class EmbeddingService:
       )
 
     return (
-      PreparedEmbeddingInput(
+      PreprocessedEmbeddingInput(
         original=input_item,
-        prepared_text=prepared_text,
+        preprocessed_text=preprocessed_text,
       ),
       None,
     )
 
-  def _encode_prepared_inputs(
+  def _encode_preprocessed_inputs(
       self,
       model: SentenceTransformer,
       model_details: EmbeddingModelDetails,
-      prepared_inputs: Sequence[PreparedEmbeddingInput],
+      preprocessed_inputs: Sequence[PreprocessedEmbeddingInput],
   ) -> list[EmbeddingResult]:
     """
     Try efficient batch encoding first.
@@ -261,8 +261,8 @@ class EmbeddingService:
     input does not prevent all other inputs from succeeding.
     """
     texts = [
-      prepared_input.prepared_text
-      for prepared_input in prepared_inputs
+      preprocessed_input.preprocessed_text
+      for preprocessed_input in preprocessed_inputs
     ]
 
     try:
@@ -276,7 +276,7 @@ class EmbeddingService:
 
       return self._build_batch_results(
         model_details=model_details,
-        prepared_inputs=prepared_inputs,
+        preprocessed_inputs=preprocessed_inputs,
         vectors=vectors,
       )
 
@@ -284,28 +284,28 @@ class EmbeddingService:
       logger.exception(
         "Batch embedding failed for %d inputs. "
         "Retrying each input individually.",
-        len(prepared_inputs),
+        len(preprocessed_inputs),
       )
 
       return [
         self._encode_single_input(
           model=model,
           model_details=model_details,
-          prepared_input=prepared_input,
+          preprocessed_input=preprocessed_input,
         )
-        for prepared_input in prepared_inputs
+        for preprocessed_input in preprocessed_inputs
       ]
 
   def _build_batch_results(
       self,
       model_details: EmbeddingModelDetails,
-      prepared_inputs: Sequence[PreparedEmbeddingInput],
+      preprocessed_inputs: Sequence[PreprocessedEmbeddingInput],
       vectors: np.ndarray,
   ) -> list[EmbeddingResult]:
     """
     Convert a successful model batch response into item-level results.
     """
-    if len(vectors) != len(prepared_inputs):
+    if len(vectors) != len(preprocessed_inputs):
       raise ValueError(
         "The model returned a different number of embeddings "
         "than requested"
@@ -313,12 +313,12 @@ class EmbeddingService:
 
     return [
       self._build_success_or_failure(
-        input_id=prepared_input.original.id,
+        input_id=preprocessed_input.original.id,
         vector=vector,
         expected_dimensions=model_details.dimensions,
       )
-      for prepared_input, vector in zip(
-        prepared_inputs,
+      for preprocessed_input, vector in zip(
+        preprocessed_inputs,
         vectors,
         strict=True,
       )
@@ -328,14 +328,14 @@ class EmbeddingService:
       self,
       model: SentenceTransformer,
       model_details: EmbeddingModelDetails,
-      prepared_input: PreparedEmbeddingInput,
+      preprocessed_input: PreprocessedEmbeddingInput,
   ) -> EmbeddingResult:
     """
     Generate one embedding after the original batch call failed.
     """
     try:
       vectors = model.encode(
-        [prepared_input.prepared_text],
+        [preprocessed_input.preprocessed_text],
         batch_size=1,
         show_progress_bar=False,
         convert_to_numpy=True,
@@ -344,7 +344,7 @@ class EmbeddingService:
 
       if len(vectors) != 1:
         return self._failure(
-          input_id=prepared_input.original.id,
+          input_id=preprocessed_input.original.id,
           code=EmbeddingErrorCode.EMBEDDING_FAILED,
           message=(
             "The model did not return exactly one embedding"
@@ -352,7 +352,7 @@ class EmbeddingService:
         )
 
       return self._build_success_or_failure(
-        input_id=prepared_input.original.id,
+        input_id=preprocessed_input.original.id,
         vector=vectors[0],
         expected_dimensions=model_details.dimensions,
       )
@@ -360,11 +360,11 @@ class EmbeddingService:
     except Exception as exception:
       logger.exception(
         "Embedding failed for input ID %s.",
-        prepared_input.original.id,
+        preprocessed_input.original.id,
       )
 
       return self._failure(
-        input_id=prepared_input.original.id,
+        input_id=preprocessed_input.original.id,
         code=EmbeddingErrorCode.EMBEDDING_FAILED,
         message=self._safe_error_message(
           exception=exception,

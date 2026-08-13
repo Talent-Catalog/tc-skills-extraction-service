@@ -21,7 +21,10 @@ from dataclasses import dataclass
 from numpy import dot
 from numpy.linalg import norm
 
-from app.models.embedding_models import EmbeddingConfigurationVersion
+from app.models.embedding_models import (
+  EmbeddingConfigurationVersion,
+  EmbeddingInputType,
+)
 
 from unittest.mock import patch
 
@@ -98,11 +101,13 @@ def cosine_similarity(left: list[float], right: list[float]) -> float:
   return float(dot(left, right) / (left_norm * right_norm))
 
 
-def generate_embeddings(
+def request_embeddings(
     client: TestClient,
     configuration: EmbeddingConfigurationVersion,
+    input_type: EmbeddingInputType,
+    inputs: list[dict[str, str]],
 ) -> dict[str, list[float]]:
-  """Generate embeddings through the public FastAPI endpoint."""
+  """Call the public FastAPI endpoint for one batch of one input type."""
   response = client.post(
     GENERATE_EMBEDDINGS_PATH,
     json={
@@ -111,11 +116,8 @@ def generate_embeddings(
         "configuration_version": configuration.value,
         "dimensions": MODEL_DIMENSIONS,
       },
-      "inputs": [
-        {"id": "query", "text": QUERY_TEXT},
-        {"id": "related", "text": RELATED_TEXT},
-        {"id": "unrelated", "text": UNRELATED_TEXT},
-      ],
+      "type": input_type.value,
+      "inputs": inputs,
     },
   )
 
@@ -123,8 +125,8 @@ def generate_embeddings(
 
   body = response.json()
 
-  assert body["requested"] == 3
-  assert body["succeeded"] == 3
+  assert body["requested"] == len(inputs)
+  assert body["succeeded"] == len(inputs)
   assert body["failed"] == 0
 
   embeddings: dict[str, list[float]] = {}
@@ -135,6 +137,39 @@ def generate_embeddings(
     assert len(result["embedding"]) == MODEL_DIMENSIONS
 
     embeddings[result["id"]] = result["embedding"]
+
+  return embeddings
+
+
+def generate_embeddings(
+    client: TestClient,
+    configuration: EmbeddingConfigurationVersion,
+) -> dict[str, list[float]]:
+  """
+  Generate embeddings for the query and the candidate documents.
+
+  The query and documents are requested separately because
+  ``EmbeddingsRequest.type`` applies to the whole batch, and a query is
+  embedded using a different input type than the documents being searched.
+  """
+  embeddings = request_embeddings(
+    client,
+    configuration,
+    EmbeddingInputType.QUERY,
+    [{"id": "query", "text": QUERY_TEXT}],
+  )
+
+  embeddings.update(
+    request_embeddings(
+      client,
+      configuration,
+      EmbeddingInputType.DOCUMENT,
+      [
+        {"id": "related", "text": RELATED_TEXT},
+        {"id": "unrelated", "text": UNRELATED_TEXT},
+      ],
+    )
+  )
 
   assert set(embeddings) == {"query", "related", "unrelated"}
 

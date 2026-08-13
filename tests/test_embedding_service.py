@@ -6,6 +6,7 @@ import pytest
 from app.models.embedding_models import (
   EmbeddingErrorCode,
   EmbeddingInput,
+  EmbeddingInputType,
   EmbeddingModelDetails,
   EmbeddingsRequest, EmbeddingConfigurationVersion,
 )
@@ -172,6 +173,7 @@ def test_generates_multiple_embeddings_in_one_batch(
   response = service.generate_embeddings(
     EmbeddingsRequest(
       model=model_details,
+      type=EmbeddingInputType.DOCUMENT,
       inputs=[
         EmbeddingInput(
           id="101",
@@ -224,6 +226,7 @@ def test_blank_text_is_an_item_failure(
   response = service.generate_embeddings(
     EmbeddingsRequest(
       model=model_details,
+      type=EmbeddingInputType.DOCUMENT,
       inputs=[
         EmbeddingInput(
           id="101",
@@ -282,6 +285,7 @@ def test_preprocessing_failure_does_not_stop_batch(
   response = service.generate_embeddings(
     EmbeddingsRequest(
       model=model_details,
+      type=EmbeddingInputType.DOCUMENT,
       inputs=[
         EmbeddingInput(
           id="101",
@@ -323,6 +327,7 @@ def test_failed_batch_is_retried_individually(
   response = service.generate_embeddings(
     EmbeddingsRequest(
       model=model_details,
+      type=EmbeddingInputType.DOCUMENT,
       inputs=[
         EmbeddingInput(
           id="101",
@@ -389,6 +394,7 @@ def test_model_dimension_mismatch_fails_entire_batch(
     service.generate_embeddings(
       EmbeddingsRequest(
         model=model_details,
+        type=EmbeddingInputType.DOCUMENT,
         inputs=[
           EmbeddingInput(
             id="101",
