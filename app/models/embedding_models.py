@@ -80,7 +80,12 @@ class EmbeddingInput(BaseModel):
 
   context: str | None = Field(
     default=None,
-    description="Optional context to be used when generating the embedding.",
+    description=(
+      "Optional context to be used when generating the embedding. For example,"
+      " if the input is a job experience, the context might be the occupation"
+      " associated with that job experience. The context could be encoded as"
+      " 'occupation:engineer'."
+    ),
   )
 
   text: str | None = Field(
