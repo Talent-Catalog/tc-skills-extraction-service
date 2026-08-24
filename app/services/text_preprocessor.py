@@ -253,14 +253,23 @@ class SpacyTextPreprocessor:
   @staticmethod
   def _validate_result(text: str) -> str:
     """
-    Reject preprocessing that removes all usable content.
+    Checks result of preprocessing.
     """
     result = text.strip()
 
-    if not result:
-      raise ValueError(
-        "spaCy preprocessing removed all meaningful text"
-      )
+    # We used to reject preprocessing that removed all usable content.
+    # This can happen, for example, if the text is all in Arabic or some other
+    # language that Spacy is not configured for.
+    # It can also happen if the text is all whitespace or filler words like
+    # "the" or "and".
+    # However, we now can also get useful data from the context such as the
+    # occupation associated with an experience.
+    # So we don't reject preprocessing that removes all usable content.
+    # The original code was:
+    # if not result:
+    #   raise ValueError(
+    #     "spaCy preprocessing removed all meaningful text"
+    #   )
 
     return result
 
