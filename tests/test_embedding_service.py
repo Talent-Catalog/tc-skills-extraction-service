@@ -26,8 +26,10 @@ class FakeTextPreprocessor(SpacyTextPreprocessor):
   def __init__(
       self,
       failure_texts: set[str] | None = None,
+      empty_texts: set[str] | None = None,
   ) -> None:
     self._failure_texts = failure_texts or set()
+    self._empty_texts = empty_texts or set()
 
   def preprocess(
       self,
@@ -41,6 +43,9 @@ class FakeTextPreprocessor(SpacyTextPreprocessor):
       raise ValueError(
         "Preprocessing test failure"
       )
+
+    if text in self._empty_texts:
+      return ""
 
     return text.strip().lower()
 
@@ -375,6 +380,236 @@ def test_failed_batch_is_retried_individually(
     [
       "other text",
     ],
+  ]
+
+
+def test_context_only_input_succeeds_without_text(
+    model_details: EmbeddingModelDetails,
+) -> None:
+  model = FakeEmbeddingModel(
+    dimensions=3
+  )
+
+  service = create_service(model)
+
+  response = service.generate_embeddings(
+    EmbeddingsRequest(
+      model=model_details,
+      type=EmbeddingInputType.DOCUMENT,
+      inputs=[
+        EmbeddingInput(
+          id="101",
+          context="Some context",
+        ),
+      ],
+    )
+  )
+
+  assert response.succeeded == 1
+  assert response.failed == 0
+
+  assert response.results[0].embedding is not None
+
+  assert model.calls == [
+    [
+      "Some context",
+    ]
+  ]
+
+
+def test_whitespace_only_context_is_treated_as_missing(
+    model_details: EmbeddingModelDetails,
+) -> None:
+  model = FakeEmbeddingModel(
+    dimensions=3
+  )
+
+  service = create_service(model)
+
+  response = service.generate_embeddings(
+    EmbeddingsRequest(
+      model=model_details,
+      type=EmbeddingInputType.DOCUMENT,
+      inputs=[
+        EmbeddingInput(
+          id="101",
+          text="Valid text",
+          context="   ",
+        ),
+      ],
+    )
+  )
+
+  assert response.succeeded == 1
+  assert response.failed == 0
+
+  assert model.calls == [
+    [
+      "valid text",
+    ]
+  ]
+
+
+def test_blank_text_and_blank_context_is_item_failure(
+    model_details: EmbeddingModelDetails,
+) -> None:
+  model = FakeEmbeddingModel(
+    dimensions=3
+  )
+
+  service = create_service(model)
+
+  response = service.generate_embeddings(
+    EmbeddingsRequest(
+      model=model_details,
+      type=EmbeddingInputType.DOCUMENT,
+      inputs=[
+        EmbeddingInput(
+          id="101",
+          text=" ",
+          context=" ",
+        ),
+      ],
+    )
+  )
+
+  assert response.succeeded == 0
+  assert response.failed == 1
+
+  failed_result = response.results[0]
+
+  assert failed_result.embedding is None
+  assert failed_result.error is not None
+  assert (
+      failed_result.error.code
+      == EmbeddingErrorCode.INVALID_TEXT
+  )
+  assert (
+      failed_result.error.message
+      == "Text and context must not both be empty"
+  )
+
+  assert model.calls == []
+
+
+def test_context_used_when_preprocessing_empties_text(
+    model_details: EmbeddingModelDetails,
+) -> None:
+  model = FakeEmbeddingModel(
+    dimensions=3
+  )
+
+  service = create_service(
+    model=model,
+    preprocessor=FakeTextPreprocessor(
+      empty_texts={
+        "Stopwords only",
+      }
+    ),
+  )
+
+  response = service.generate_embeddings(
+    EmbeddingsRequest(
+      model=model_details,
+      type=EmbeddingInputType.DOCUMENT,
+      inputs=[
+        EmbeddingInput(
+          id="101",
+          text="Stopwords only",
+          context="Some context",
+        ),
+      ],
+    )
+  )
+
+  assert response.succeeded == 1
+  assert response.failed == 0
+
+  assert model.calls == [
+    [
+      "Some context",
+    ]
+  ]
+
+
+def test_text_empty_after_preprocessing_with_no_context_is_item_failure(
+    model_details: EmbeddingModelDetails,
+) -> None:
+  model = FakeEmbeddingModel(
+    dimensions=3
+  )
+
+  service = create_service(
+    model=model,
+    preprocessor=FakeTextPreprocessor(
+      empty_texts={
+        "Stopwords only",
+      }
+    ),
+  )
+
+  response = service.generate_embeddings(
+    EmbeddingsRequest(
+      model=model_details,
+      type=EmbeddingInputType.DOCUMENT,
+      inputs=[
+        EmbeddingInput(
+          id="101",
+          text="Stopwords only",
+        ),
+      ],
+    )
+  )
+
+  assert response.succeeded == 0
+  assert response.failed == 1
+
+  failed_result = response.results[0]
+
+  assert failed_result.embedding is None
+  assert failed_result.error is not None
+  assert (
+      failed_result.error.code
+      == EmbeddingErrorCode.INVALID_TEXT
+  )
+  assert (
+      failed_result.error.message
+      == "Text and context were both empty after preprocessing"
+  )
+
+  assert model.calls == []
+
+
+def test_context_and_text_are_combined_for_embedding(
+    model_details: EmbeddingModelDetails,
+) -> None:
+  model = FakeEmbeddingModel(
+    dimensions=3
+  )
+
+  service = create_service(model)
+
+  response = service.generate_embeddings(
+    EmbeddingsRequest(
+      model=model_details,
+      type=EmbeddingInputType.DOCUMENT,
+      inputs=[
+        EmbeddingInput(
+          id="101",
+          text="Some text",
+          context="Extra context",
+        ),
+      ],
+    )
+  )
+
+  assert response.succeeded == 1
+  assert response.failed == 0
+
+  assert model.calls == [
+    [
+      "Extra context\nsome text",
+    ]
   ]
 
 

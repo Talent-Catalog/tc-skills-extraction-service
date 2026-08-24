@@ -42,6 +42,24 @@ class PreprocessedEmbeddingInput:
   original: EmbeddingInput
   preprocessed_text: str
 
+  def get_text_to_embed(self) -> str:
+    """
+    The text that will be processed by the embedding model will be the context
+    followed by the preprocessed text.
+    If either is empty, the other will be returned.
+    If both are empty, an empty string will be returned.
+    """
+    context = (self.original.context or "").strip()
+    preprocessed_text = self.preprocessed_text.strip()
+
+    if not context:
+      return preprocessed_text
+
+    if not preprocessed_text:
+      return context
+
+    return f"{context}\n{preprocessed_text}"
+
 
 class SentenceTransformerModelProvider:
   """
@@ -126,8 +144,10 @@ class EmbeddingService:
       request: EmbeddingsRequest,
   ) -> EmbeddingsResponse:
     """
-    Generate one item-level outcome for every input in the request.
+    Generate one response for every input in the request.
     """
+
+    # Get and check the requested embedding model
     model = self._model_provider.get_model(
       request.model
     )
@@ -137,7 +157,10 @@ class EmbeddingService:
       model_details=request.model,
     )
 
+
+    # Preprocess each input before generating its embedding.
     preprocessed_inputs: list[PreprocessedEmbeddingInput] = []
+    # Output embeddings are stored here.
     results_by_id: dict[str, EmbeddingResult] = {}
 
     for input_item in request.inputs:
@@ -201,43 +224,53 @@ class EmbeddingService:
     EmbeddingResult | None,
   ]:
     """
-    Validate and preprocess one input without affecting other batch items.
+    Validate and preprocess the given input text.
+
+    Text alone, context alone, or both together are acceptable. An input
+    only fails when there is nothing left to embed, either before or after
+    preprocessing.
     """
-    if not input_item.text or not input_item.text.strip():
+    if self._is_blank(input_item.text) and self._is_blank(input_item.context):
       return None, self._failure(
         input_id=input_item.id,
         code=EmbeddingErrorCode.INVALID_TEXT,
-        message="Text must not be empty",
+        message="Text and context must not both be empty",
       )
 
-    try:
-      preprocessed_text = self._text_preprocessor.preprocess(
-        text=input_item.text,
-        configuration_version=(
-          model_details.configuration_version
-        ),
-      )
+    text = input_item.text
 
-    except Exception as exception:
-      logger.exception(
-        "Preprocessing failed for input ID %s.",
-        input_item.id,
-      )
+    if text is None or not text.strip():
+      preprocessed_text = ""
 
-      return None, self._failure(
-        input_id=input_item.id,
-        code=EmbeddingErrorCode.PREPROCESSING_FAILED,
-        message=self._safe_error_message(
-          exception=exception,
-          fallback="Text preprocessing failed",
-        ),
-      )
+    else:
+      try:
+        preprocessed_text = self._text_preprocessor.preprocess(
+          text=text,
+          configuration_version=(
+            model_details.configuration_version
+          ),
+        )
 
-    if not preprocessed_text or not preprocessed_text.strip():
+      except Exception as exception:
+        logger.exception(
+          "Preprocessing failed for input ID %s.",
+          input_item.id,
+        )
+
+        return None, self._failure(
+          input_id=input_item.id,
+          code=EmbeddingErrorCode.PREPROCESSING_FAILED,
+          message=self._safe_error_message(
+            exception=exception,
+            fallback="Text preprocessing failed",
+          ),
+        )
+
+    if self._is_blank(preprocessed_text) and self._is_blank(input_item.context):
       return None, self._failure(
         input_id=input_item.id,
         code=EmbeddingErrorCode.INVALID_TEXT,
-        message="Text was empty after preprocessing",
+        message="Text and context were both empty after preprocessing",
       )
 
     return (
@@ -261,7 +294,7 @@ class EmbeddingService:
     input does not prevent all other inputs from succeeding.
     """
     texts = [
-      preprocessed_input.preprocessed_text
+      preprocessed_input.get_text_to_embed()
       for preprocessed_input in preprocessed_inputs
     ]
 
@@ -287,6 +320,7 @@ class EmbeddingService:
         len(preprocessed_inputs),
       )
 
+      # Process each input individually.
       return [
         self._encode_single_input(
           model=model,
@@ -335,7 +369,9 @@ class EmbeddingService:
     """
     try:
       vectors = model.encode(
-        [preprocessed_input.preprocessed_text],
+        [
+          preprocessed_input.get_text_to_embed()
+        ],
         batch_size=1,
         show_progress_bar=False,
         convert_to_numpy=True,
@@ -446,6 +482,13 @@ class EmbeddingService:
         f"'{model_details.configuration_version}' expects "
         f"{model_details.dimensions}"
       )
+
+  @staticmethod
+  def _is_blank(text: str | None) -> bool:
+    """
+    Return whether the given text is missing or contains only whitespace.
+    """
+    return not text or not text.strip()
 
   @staticmethod
   def _failure(
