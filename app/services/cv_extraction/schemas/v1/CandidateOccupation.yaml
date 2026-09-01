@@ -1,0 +1,16 @@
+type: object
+description: The candidate's occupation
+properties:
+  occupation:
+    description: The candidate's occupation.
+    allOf:
+      - $ref: ./Occupation.yaml
+  yearsExperience:
+    type: integer
+    description: The number of years of experience the candidate has in this job.
+    example: 5
+  candidateJobExperiences:
+    type: array
+    description: List of job experiences of the candidate in this occupation.
+    items:
+      $ref: ./CandidateJobExperience.yaml

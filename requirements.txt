@@ -6,6 +6,27 @@ httpx==0.28.1
 pytest
 numpy==2.5.1
 
+# Added for POST /extract_candidate_occupations (app/services/cv_extraction/):
+python-multipart==0.0.32  # FastAPI UploadFile/File(...) form uploads
+pyyaml==6.0.3             # reads the vendored schema YAML in cv_extraction/schemas/
+anthropic==1.2.0          # Claude API client for Stage 2/4 of the extraction pipeline
+
+# docling==2.124.0 converts uploaded PDFs to Doctags markup (Stage 1 input).
+#
+# VERIFIED, NOT YET RESOLVED: installing docling unconstrained pulls its own
+# torch dependency - resolved to torch 2.13.0, the full ~530MB CUDA build,
+# not the "+cpu" build pinned below for sentence-transformers. Given the OOM
+# incident documented below this same file already caused by an unpinned
+# torch change, this WILL make the same mistake again if left as-is: two
+# different torch installs can't coexist, and whichever wins is unlikely to
+# be the small CPU build this service actually needs. A local attempt to
+# force docling to resolve against the existing torch==2.8.0+cpu pin did not
+# cleanly succeed in a throwaway venv (for reasons not fully run down - it
+# may be specific to that environment's network path to PyTorch's index) -
+# this needs to be verified for real in this project's own dev/CI
+# environment before merging, not assumed fixed by adding this comment.
+docling==2.124.0
+
 # sentence-transformers generates the embeddings for the /embeddings endpoint.
 # It is pinned (like everything else here) because an earlier unpinned install
 # silently picked up new sentence-transformers/torch releases between builds,

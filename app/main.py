@@ -44,16 +44,20 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
+import anthropic
 import httpx
 import spacy
 from fastapi import FastAPI
 from spacy.matcher import PhraseMatcher
 
+from app.api.cv_extraction_api import router as cv_extraction_router
 from app.api.embedding_api import router as embedding_router
 from app.api.explanation_api import router as explanation_router
 from app.api.health_api import router as health_router
 from app.api.skills_api import router as skills_router
 from app.dependencies import ApplicationServices
+from app.services.cv_extraction.cv_extraction_service import CvExtractionService
+from app.services.cv_extraction.pdf_to_doctags import PdfToDoctagsConverter
 from app.services.embedding_service import (
   EmbeddingService,
   SentenceTransformerModelProvider,
@@ -121,11 +125,20 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
   )
   explanation_service = ExplanationService(llm_client)
 
+  # DocumentConverter loads Docling's layout/OCR models once, like
+  # spaCy's nlp.load() above - so it's built here, not per request.
+  cv_extraction_service = CvExtractionService(
+    pdf_converter=PdfToDoctagsConverter(),
+    anthropic_client=anthropic.Anthropic(api_key=settings.anthropic_api_key),
+    model_name=settings.cv_extraction_model_name,
+  )
+
   # Store the services in the app state so that they can be accessed in the dependencies
   app_.state.services = ApplicationServices(
     embedding_service=embedding_service,
     skills_extractor=skills_extractor,
     explanation_service=explanation_service,
+    cv_extraction_service=cv_extraction_service,
   )
 
   app_.state.ready = True
@@ -152,6 +165,7 @@ app.include_router(embedding_router)
 app.include_router(explanation_router)
 app.include_router(skills_router)
 app.include_router(health_router)
+app.include_router(cv_extraction_router)
 
 
 def build_matcher(nlp: spacy.language.Language, skills: list[str]) -> PhraseMatcher:
