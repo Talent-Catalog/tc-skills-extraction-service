@@ -13,13 +13,6 @@ class Settings(BaseSettings):
   llm_api_key: str | None = None
   llm_request_timeout_seconds: float = Field(default=60.0, gt=0)
 
-  # anthropic_api_key is optional here purely for parity with the settings
-  # above - if unset, anthropic.Anthropic() falls back to the standard
-  # ANTHROPIC_API_KEY environment variable / `ant auth login` profile on
-  # its own, same as passing api_key=None explicitly would.
-  anthropic_api_key: str | None = None
-  cv_extraction_model_name: str = "claude-opus-5"
-
   model_config = SettingsConfigDict(env_file=str(Path(__file__).resolve().parent.parent / ".env"))
 
 # noinspection PyArgumentList

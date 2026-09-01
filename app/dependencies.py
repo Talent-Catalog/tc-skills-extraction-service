@@ -1,7 +1,6 @@
 from fastapi import Request
 from dataclasses import dataclass
 
-from app.services.cv_extraction.cv_extraction_service import CvExtractionService
 from app.services.embedding_service import EmbeddingService
 from app.services.explanation_service import ExplanationService
 from app.services.skills_extractor import SkillsExtractor
@@ -12,7 +11,6 @@ class ApplicationServices:
   embedding_service: EmbeddingService
   skills_extractor: SkillsExtractor
   explanation_service: ExplanationService
-  cv_extraction_service: CvExtractionService
 
 
 def get_embedding_service(request: Request) -> EmbeddingService:
@@ -32,8 +30,3 @@ def get_skills_extractor(request: Request) -> SkillsExtractor:
 def get_explanation_service(request: Request) -> ExplanationService:
   """Returns the singleton explanation service created during startup."""
   return request.app.state.services.explanation_service
-
-
-def get_cv_extraction_service(request: Request) -> CvExtractionService:
-  """Returns the singleton CV-extraction service created during startup."""
-  return request.app.state.services.cv_extraction_service
