@@ -1,44 +1,30 @@
-"""
-Dependencies:
-
-#see https://realpython.com/get-started-with-fastapi/
-# Note also Intellij's support for FastAPI development
-# https://www.jetbrains.com/guide/tags/fastapi/
-
-# Note also that we should be running Python version 3.12 - because we are not
-# sure that the libraries that we use have been converted to later versions.
-# See https://pypi.org/project/spacy/
-
-# Run the following command in your Intellij terminal (which will be running
-# in the same virtual environment (venv) as your Intellij project.
-# There will be a .venv subdirectory in your project directory.
-
-python -m pip install "fastapi[standard]"
-
-(Note that fastapi[standard] includes uvicorn, pydantic, and other dependencies)
-
-pip install pydantic-settings
-
-pip install spacy
-
-python -m spacy download en_core_web_sm
-
-# Run the app with:
-
-uvicorn app.main:app --reload --log-config=log_conf.yaml
-
-OPTIONALLY...
-# Run the app inside Intellij
-
-You need to have installed all the above pip and python commands so that all
-the libraries are entered into the virtual environment (venv) of your Intellij project.
-
-Create a new Intellij run configuration. Press + and select Python.
-Select "module" (not "script") and enter "uvicorn" in the module field.
-In the parameters field, enter "app.main:app --log-config=log_conf.yaml"
-Select the Python interpreter that is the same as your project interpreter (the venv).
-
-"""
+# Local development setup - see README.md for the full instructions,
+# including why local development uses requirements-dev.txt while the
+# deployed image uses requirements.txt.
+#
+# Quick reference (run in your IntelliJ terminal, which uses the same
+# Python interpreter/venv as your IntelliJ project):
+#
+#   pip install -r requirements-dev.txt
+#   python -m spacy download en_core_web_sm
+#   uvicorn app.main:app --reload --log-config=log_conf.yaml
+#
+# This project targets Python 3.12, matching the Dockerfile's base image.
+# It won't run on Python 3.14: spacy and torch (see requirements.txt) have
+# no 3.14 wheels at the versions pinned here, so pip install fails outright
+# on a venv built against 3.14. Neither is a permanent restriction - spacy's
+# own latest release (3.8.16) already ships 3.14 wheels, and torch's latest
+# (2.13.0) does too - but bumping either here needs its own verification
+# (torch in particular, given the Fargate OOM history in requirements.txt).
+#
+#
+# To run inside IntelliJ instead of the terminal: create a new Python run
+# configuration (+ > Python), select "Module" (not "Script") and enter
+# "uvicorn" as the module, "app.main:app --log-config=log_conf.yaml" as the
+# parameters, and select your project's Python interpreter.
+#
+# See also https://realpython.com/get-started-with-fastapi/ and IntelliJ's
+# FastAPI support: https://www.jetbrains.com/guide/tags/fastapi/
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
@@ -81,9 +67,7 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
   be accessed in other parts of the code through Request dependency injection.
   Globals are accessible through Request.app.state - whose values are set
   in this set-up function.
-  """
 
-  """
   Creates expensive application services once before requests are accepted.
   """
   embedding_service = EmbeddingService(

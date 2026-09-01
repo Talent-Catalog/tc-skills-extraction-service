@@ -70,9 +70,15 @@ CV_EXTRACTION_MODEL_NAME=claude-opus-5
 Anthropic SDK falls back to resolving it from the environment itself if
 unset here - one of the two still needs to be set for this endpoint to work.
 
-**Before deploying:** `docling` (added for PDF→doctags conversion) pulls
-its own `torch` dependency by default - a full ~530MB CUDA build, not the
-`+cpu` build already pinned in `requirements.txt` for `sentence-transformers`.
-This has not yet been verified as resolved - see the comment above the
-`docling` line in `requirements.txt` before merging, given this project's
-prior OOM-on-Fargate incident from an unpinned torch change.
+**Dependencies:** `docling` (added for PDF→doctags conversion) pulls its own
+`torch` dependency by default - a full CUDA build several GB heavier than
+the `+cpu` build pinned in `requirements.txt` for `sentence-transformers`.
+This is resolved for the deployed (Linux/Fargate) image - see the comment
+above the `docling` line in `requirements.txt` for how it was verified,
+given this project's prior OOM-on-Fargate incident from an unpinned torch
+change.
+
+For local development on macOS, use `requirements-dev.txt` instead of
+`requirements.txt` - the `+cpu` wheel pin only exists for Linux/Windows, so
+`requirements.txt` fails to resolve on a Mac. See that file's header for
+details.

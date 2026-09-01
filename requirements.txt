@@ -1,5 +1,11 @@
+# Deployment install (Linux/Fargate) - pins torch to the "+cpu" wheel (see
+# the torch comment block at the bottom of this file). On macOS this file
+# will fail to resolve at the torch line - use requirements-dev.txt for
+# local development instead; see that file's header for why.
 fastapi[standard]==0.139.0
-spacy==3.8.14
+#(Note that fastapi[standard] includes uvicorn, pydantic, and other dependencies)
+
+spacy==3.8.14  # no Python 3.14 wheel at this pin (3.8.16 has one) - this project targets 3.12, see main.py
 pydantic==2.13.4
 pydantic-settings==2.14.2
 httpx==0.28.1
@@ -13,18 +19,22 @@ anthropic==1.2.0          # Claude API client for Stage 2/4 of the extraction pi
 
 # docling==2.124.0 converts uploaded PDFs to Doctags markup (Stage 1 input).
 #
-# VERIFIED, NOT YET RESOLVED: installing docling unconstrained pulls its own
-# torch dependency - resolved to torch 2.13.0, the full ~530MB CUDA build,
-# not the "+cpu" build pinned below for sentence-transformers. Given the OOM
-# incident documented below this same file already caused by an unpinned
-# torch change, this WILL make the same mistake again if left as-is: two
-# different torch installs can't coexist, and whichever wins is unlikely to
-# be the small CPU build this service actually needs. A local attempt to
-# force docling to resolve against the existing torch==2.8.0+cpu pin did not
-# cleanly succeed in a throwaway venv (for reasons not fully run down - it
-# may be specific to that environment's network path to PyTorch's index) -
-# this needs to be verified for real in this project's own dev/CI
-# environment before merging, not assumed fixed by adding this comment.
+# RESOLVED (2026-09-01): the earlier concern here was that installing docling
+# unconstrained pulls its own torch dependency, resolving to the full CUDA
+# build instead of the "+cpu" build pinned below for sentence-transformers -
+# which would repeat the OOM incident documented further down this file.
+# Verified for real via `docker build` against this project's own Dockerfile
+# (python:3.12-slim, linux/amd64, matching Fargate's architecture): with
+# torch==2.8.0+cpu already pinned and --extra-index-url pointing at PyTorch's
+# CPU index, pip resolves docling against that same torch==2.8.0+cpu install
+# with no conflict (`pip check` clean, no nvidia-*/CUDA packages pulled in).
+# The earlier "did not cleanly succeed in a throwaway venv" result was a
+# platform-tag artifact of testing on macOS/ARM: torch's "+cpu" wheels are
+# only published for linux/win under the manylinux_2_28 tag (macOS torch
+# wheels have no "+cpu" suffix - they're CPU/MPS-only by default on PyPI), so
+# a Mac-native venv can never find the pinned "+cpu" version at all,
+# regardless of docling. Testing must use a linux/amd64 environment (Docker,
+# as above, or CI) to mean anything for this dependency.
 docling==2.124.0
 
 # sentence-transformers generates the embeddings for the /embeddings endpoint.
@@ -53,5 +63,10 @@ sentence-transformers==5.7.0
 # instead of PyPI's default CUDA build: PyPI has no package matching that
 # literal version string, so there's no ambiguity about which index it must
 # come from.
+#
+# This pin is also, like spacy above, the other reason this project can't
+# run on Python 3.14: torch==2.8.0 has no cp314 wheel (PyTorch's latest,
+# 2.13.0, does). Bumping it isn't a small patch jump like spacy's fix -
+# verify the OOM-on-Fargate history above still holds before touching this.
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.8.0+cpu
