@@ -55,6 +55,14 @@ jobs:
         run: |
           echo "TBB_IMAGE_URI=${{ steps.ecr-tbb.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.SHA_TAG }}"
 
+      - name: Force new ECS deployment (TBB staging)
+        run: |
+          aws ecs update-service \
+            --cluster tc-skills-extraction \
+            --service tc-skills-extraction \
+            --force-new-deployment \
+            --region us-east-1
+
       # --- Deploy to OPC Staging (eu-west-2) ---
 
       - name: Configure AWS credentials for OPC
@@ -82,3 +90,11 @@ jobs:
       - name: Show OPC image details
         run: |
           echo "OPC_IMAGE_URI=${{ steps.ecr-opc.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.SHA_TAG }}"
+
+      - name: Force new ECS deployment (OPC staging)
+        run: |
+          aws ecs update-service \
+            --cluster tc-skills-extraction \
+            --service tc-skills-extraction \
+            --force-new-deployment \
+            --region eu-west-2
