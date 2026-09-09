@@ -55,13 +55,16 @@ jobs:
         run: |
           echo "TBB_IMAGE_URI=${{ steps.ecr-tbb.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.SHA_TAG }}"
 
-      - name: Force new ECS deployment (TBB staging)
-        run: |
-          aws ecs update-service \
-            --cluster tc-skills-extraction \
-            --service tc-skills-extraction \
-            --force-new-deployment \
-            --region us-east-1
+      # No active skills-extraction service in TBB staging at the moment, so there is
+      # nothing to restart here — the image is still pushed to TBB ECR above. Re-enable
+      # if required once staging is normalised into a single AWS account.
+      # - name: Force new ECS deployment (TBB staging)
+      #   run: |
+      #     aws ecs update-service \
+      #       --cluster tc-skills-extraction \
+      #       --service tc-skills-extraction \
+      #       --force-new-deployment \
+      #       --region us-east-1
 
       # --- Deploy to OPC Staging (eu-west-2) ---
 
