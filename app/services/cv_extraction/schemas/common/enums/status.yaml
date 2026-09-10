@@ -1,0 +1,10 @@
+type: string
+enum:
+  - "ACTIVE"
+  - "INACTIVE"
+  - "DELETED"
+x-enum-varnames:
+  - "ACTIVE"
+  - "INACTIVE"
+  - "DELETED"
+example: "ACTIVE"

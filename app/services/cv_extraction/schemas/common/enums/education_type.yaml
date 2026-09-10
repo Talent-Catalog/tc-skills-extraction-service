@@ -1,0 +1,14 @@
+type: string
+enum:
+  - "ASSOCIATE"
+  - "VOCATIONAL"
+  - "BACHELOR"
+  - "MASTERS"
+  - "DOCTORAL"
+x-enum-varnames:
+  - "ASSOCIATE"
+  - "VOCATIONAL"
+  - "BACHELOR"
+  - "MASTERS"
+  - "DOCTORAL"
+example: "MASTERS"

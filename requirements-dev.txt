@@ -1,0 +1,57 @@
+# Local-development install for platforms with no PyTorch "+cpu" wheel
+# (macOS, in practice). Use this instead of requirements.txt when installing
+# into an IntelliJ/local venv:
+#
+#   pip install -r requirements-dev.txt
+#
+# Everything below is identical to requirements.txt EXCEPT the final torch
+# line - keep every other pin numerically in sync with that file by hand;
+# there's no tooling here to enforce it.
+#
+# Why this file exists: requirements.txt pins torch==2.8.0+cpu via
+# --extra-index-url so the *deployed* (Linux/Fargate) image gets PyTorch's
+# small CPU-only build instead of the full CUDA build pip installs by
+# default - see the torch comment block at the bottom of requirements.txt
+# for the full reasoning. That exact "+cpu" version string is only published
+# for Linux and Windows wheels; PyPI has no macOS build with a "+cpu" suffix
+# at all, so `pip install -r requirements.txt` fails outright on a Mac with
+# "No matching distribution found for torch==2.8.0+cpu" - it's not a smaller
+# CPU/CUDA choice on macOS, it's a hard resolver error.
+#
+# This isn't a problem `--extra-index-url` needs to solve locally: macOS
+# PyPI wheels for torch are CPU/MPS-only already (Apple platforms have no
+# CUDA), so a plain, unsuffixed version pin below gets the same "no CUDA
+# bloat" outcome on a Mac that the "+cpu" pin gets on Linux - just via a
+# different mechanism (there's only one macOS build to resolve to).
+fastapi[standard]==0.139.0
+spacy==3.8.14  # no Python 3.14 wheel at this pin (3.8.16 has one) - build your local .venv against 3.12
+pydantic==2.13.4
+pydantic-settings==2.14.2
+httpx==0.28.1
+pytest
+numpy==2.5.1
+
+# Added for POST /extract_candidate_occupations (app/services/cv_extraction/):
+python-multipart==0.0.32  # FastAPI UploadFile/File(...) form uploads
+pyyaml==6.0.3             # reads the vendored schema YAML in cv_extraction/schemas/
+anthropic==1.2.0          # Claude API client for Stage 2/4 of the extraction pipeline
+
+# docling==2.124.0 converts uploaded PDFs to Doctags markup (Stage 1 input).
+# See requirements.txt for the full docling/torch resolution history.
+docling==2.124.0
+
+# sentence-transformers generates the embeddings for the /embeddings endpoint.
+sentence-transformers==5.7.0
+
+# No --extra-index-url and no "+cpu" suffix here - see the file header above.
+# Keep this version number in sync with the torch==2.8.0+cpu pin in
+# requirements.txt.
+#
+# Also, like spacy above: no Python 3.14 wheel at this pin (PyTorch's
+# latest, 2.13.0, has one) - build your local .venv against 3.12.
+torch==2.8.0
+
+# debugpy - required by IntelliJ/PyCharm's DAP-based Python debugger to
+# launch a debug session against this interpreter. Not needed by the
+# deployed image, so it's dev-only and absent from requirements.txt.
+debugpy==1.8.21

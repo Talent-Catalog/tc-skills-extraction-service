@@ -1,0 +1,15 @@
+type: object
+description: The candidate's language proficiency.
+properties:
+  language:
+    description: The language that the candidate is proficient in.
+    allOf:
+      - $ref: ./Language.yaml
+  writtenLevel:
+    description: The candidate's written proficiency in this language.
+    allOf:
+      - $ref: ./LanguageLevel.yaml
+  spokenLevel:
+    description: The candidate's spoken proficiency in this language.
+    allOf:
+      - $ref: ./LanguageLevel.yaml

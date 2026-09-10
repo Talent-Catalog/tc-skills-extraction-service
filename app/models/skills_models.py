@@ -11,6 +11,10 @@ class SkillName(BaseModel):
   lang: str = Field(..., description="Language - eg 'en' for English")
   name: str = Field(..., description="Name of the skill")
 
+  """
+  Compare two SkillName objects for sorting.
+  The comparison is case-insensitive and based on the skill name.
+  """
   def __lt__(self, other):
     if not isinstance(other, SkillName):
       return NotImplemented

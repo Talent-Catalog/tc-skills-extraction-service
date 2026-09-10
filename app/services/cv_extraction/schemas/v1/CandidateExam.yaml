@@ -1,0 +1,22 @@
+type: object
+description: An exam that a candidate has taken.
+properties:
+  exam:
+    type: string
+    description: The type of the exam.
+    allOf:
+      - $ref: ../common/enums/exam.yaml
+    example: "OTHER"
+  otherExam:
+    type: string
+    description: The name of the exam if the exam type is "Other".
+    example: "Test of English for Aviation"
+  score:
+    type: string
+    description: The score of the exam.
+    example: "8.5"
+  year:
+    type: integer
+    format: int64
+    description: The year the exam was taken.
+    example: 2024

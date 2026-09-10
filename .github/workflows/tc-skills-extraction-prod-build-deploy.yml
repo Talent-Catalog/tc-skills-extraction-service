@@ -6,27 +6,16 @@ on:
   workflow_dispatch:
 
 env:
-  AWS_REGION: us-east-1
   ECR_REPOSITORY: tc-skills-extraction
   DOCKERFILE: Dockerfile
 
 jobs:
   build:
+    name: Build, Push and Deploy to Production
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: ecr
-        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Compute image tags
         id: meta
@@ -38,7 +27,20 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build & push to ECR
+      # --- Deploy to TBB Production (us-east-1) ---
+
+      - name: Configure AWS credentials for TBB
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to TBB ECR
+        id: ecr-tbb
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & push to TBB ECR
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -46,10 +48,37 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.SHA_TAG }}
-            ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.LATEST_TAG }}
+            ${{ steps.ecr-tbb.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.SHA_TAG }}
+            ${{ steps.ecr-tbb.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.LATEST_TAG }}
 
-      - name: Show image details
+      - name: Show TBB image details
         run: |
-          echo "IMAGE_URI=${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.SHA_TAG }}"
-          echo "IMAGE_TAG=${{ steps.meta.outputs.SHA_TAG }}"
+          echo "TBB_IMAGE_URI=${{ steps.ecr-tbb.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.SHA_TAG }}"
+
+      # --- Deploy to OPC Production (eu-west-2) ---
+
+      - name: Configure AWS credentials for OPC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_OPC_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_OPC_PROD }}
+          aws-region: eu-west-2
+
+      - name: Login to OPC ECR
+        id: ecr-opc
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & push to OPC ECR
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ env.DOCKERFILE }}
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.ecr-opc.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.SHA_TAG }}
+            ${{ steps.ecr-opc.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.LATEST_TAG }}
+
+      - name: Show OPC image details
+        run: |
+          echo "OPC_IMAGE_URI=${{ steps.ecr-opc.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.SHA_TAG }}"

@@ -1,15 +1,29 @@
 import spacy
 from spacy.matcher import PhraseMatcher
 from typing import List
-from app.models import SkillName
 import logging
+
+from app.models.skills_models import SkillName
 
 logger = logging.getLogger(__name__)
 
 class SkillsExtractor:
-  def __init__(self, nlp: spacy.language.Language, matcher: PhraseMatcher):
+  def __init__(
+      self,
+      nlp: spacy.language.Language,
+      matcher: PhraseMatcher,
+  ) -> None:
+    """
+    Create a skill extractor using the supplied spaCy pipeline and matcher.
+    """
+    if nlp.lang is None:
+      raise ValueError(
+        "spaCy language model does not define a language"
+      )
+
     self._nlp = nlp
     self._matcher = matcher
+    self._lang = nlp.lang
 
   def extract_skills(self, text: str) -> List[SkillName]:
 
@@ -24,7 +38,7 @@ class SkillsExtractor:
     # De-dup skills
     skills = set([s.lower() for s in skill_matches])
 
-    skill_names = [SkillName(name=skill, lang=self._nlp.lang) for skill in skills]
+    skill_names = [SkillName(name=skill, lang=self._lang) for skill in skills]
     skill_names.sort()
 
     # Log the extracted skills
