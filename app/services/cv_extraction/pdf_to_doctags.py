@@ -26,8 +26,11 @@ class PdfToDoctagsConverter:
   failure mode has been accounted for individually.
   """
 
-  def __init__(self) -> None:
-    self._converter = DocumentConverter()
+  def __init__(self, converter: DocumentConverter | None = None) -> None:
+    # Accepts an injected converter (like EmbeddingService's model_provider and
+    # LlmClient's http_client) so tests can substitute a fake instead of
+    # loading Docling's real layout/OCR models.
+    self._converter = converter or DocumentConverter()
 
   def convert(self, pdf_bytes: bytes) -> str:
     """Convert PDF bytes to a Doctags string."""

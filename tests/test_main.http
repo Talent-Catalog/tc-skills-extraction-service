@@ -94,3 +94,38 @@ Content-Type: application/json
 }
 
 ###
+
+# Replace `< ./resume.pdf` below with a path to an actual PDF file - no sample
+# is checked into the repo. Path is relative to this .http file (tests/).
+#
+# timeout sets the IDE HTTP Client's own response-read timeout, not
+# anything server-side: Docling's PDF->Doctags conversion plus two
+# sequential real Anthropic calls (Stage 2 classify, Stage 4 correct) can
+# take 60-90+ seconds end to end, well past the client's ~60s default -
+# the request can still succeed server-side after the client alone times out.
+
+# @timeout 3 m
+POST http://localhost:8000/extract_candidate_occupations
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="cvTest1.pdf"
+Content-Type: application/pdf
+
+< ./cvTest1.pdf
+--WebAppBoundary--
+
+###
+
+# @timeout 3 m
+POST https://test.skills.tctalent.org/extract_candidate_occupations
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="cvTest1.pdf"
+Content-Type: application/pdf
+
+< ./cvTest1.pdf
+--WebAppBoundary--
+
+###
