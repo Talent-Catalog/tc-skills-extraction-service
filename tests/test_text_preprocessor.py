@@ -232,6 +232,46 @@ def test_v2_normalizes_different_word_forms(
   assert "prepare" in second_result
 
 
+def test_v1_strips_html_tags(
+    preprocessor: SpacyTextPreprocessor,
+) -> None:
+  """
+  V1 should strip HTML tags before any other cleanup.
+  """
+  result = preprocessor.preprocess_v1(
+    "<p>The <b>accountant</b> prepared reports.</p>"
+  )
+
+  assert result == "The accountant prepared reports."
+
+
+def test_v1_strips_html_tags_without_merging_adjacent_words(
+    preprocessor: SpacyTextPreprocessor,
+) -> None:
+  """
+  Adjacent tags with no whitespace between them must not merge the words
+  either side of the boundary into one word.
+  """
+  result = preprocessor.preprocess_v1(
+    "<li>Python</li><li>accounting</li>"
+  )
+
+  assert result == "Python accounting"
+
+
+def test_html_only_text_is_rejected(
+    preprocessor: SpacyTextPreprocessor,
+) -> None:
+  """
+  Text that is entirely HTML tags has nothing left after stripping.
+  """
+  with pytest.raises(
+      ValueError,
+      match="Text must not be empty",
+  ):
+    preprocessor.preprocess_v1("<br/>")
+
+
 def test_empty_text_is_rejected(
     preprocessor: SpacyTextPreprocessor,
 ) -> None:
