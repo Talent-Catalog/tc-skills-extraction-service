@@ -10,16 +10,22 @@ from app.services.llm_client import LlmAuthentication
 class Settings(BaseSettings):
   SKILLS_BASE_URL: AnyHttpUrl
 
-  # These default values can be overridden by env variables: LLM_BASE_URL etc.
-  # However, these default values will work for local dev purposes if you
-  # generate a Short-Term API key on AWS Amazon Bedrock:
-  # see https://eu-west-2.console.aws.amazon.com/bedrock/home?region=eu-west-2#/api-keys?tab=short-term
-  # Specify that API key in the LLM_API_KEY environment variable.
-  llm_base_url: str = "https://bedrock-runtime.eu-west-2.amazonaws.com/openai/v1"
+  # llm_base_url=None means "use the default Amazon Bedrock OpenAI-compatible
+  # endpoint for llm_aws_region" (constructed in main.py). Override it to
+  # point at another OpenAI-compatible endpoint instead, such as a locally
+  # hosted vLLM server.
+  llm_base_url: str | None = None
+  llm_aws_region: str = "eu-west-2"
   llm_model_name: str = "qwen.qwen3-235b-a22b-2507-v1:0"
-  llm_authentication: LlmAuthentication = LlmAuthentication.BEARER
 
-  # Set this to an Amazon Bedrock short-term API key - see comments above
+  # AWS_SIGV4 is the default: an appropriately authorised developer's normal
+  # AWS credentials (or, in ECS, the task role) are enough to run this
+  # service with no LLM-specific environment variables. BEARER (a short-term
+  # Bedrock API key in llm_api_key) and NONE (no authentication, e.g. a
+  # local vLLM server) remain available - see LlmAuthentication.
+  llm_authentication: LlmAuthentication = LlmAuthentication.AWS_SIGV4
+
+  # Only needed when llm_authentication is BEARER.
   llm_api_key: str | None = None
   llm_request_timeout_seconds: float = Field(default=60.0, gt=0)
 

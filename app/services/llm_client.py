@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from enum import StrEnum
 from typing import Any, Protocol
 
@@ -14,7 +13,7 @@ from botocore.session import Session as BotocoreSession
 class AwsCredentialsProvider(Protocol):
   """
   The minimal AWS session interface LlmClient needs for AWS_SIGV4: credential
-  and region discovery.
+  discovery through the standard AWS credential provider chain.
 
   botocore.session.Session satisfies this structurally; declaring it here
   (rather than typing directly against that unstubbed botocore class) lets
@@ -22,8 +21,6 @@ class AwsCredentialsProvider(Protocol):
   """
 
   def get_credentials(self) -> Any: ...
-
-  def get_config_variable(self, name: str) -> str | None: ...
 
 
 class LlmAuthentication(StrEnum):
@@ -79,6 +76,7 @@ class LlmClient:
       http_client: httpx.Client,
       authentication: LlmAuthentication = LlmAuthentication.NONE,
       api_key: str | None = None,
+      llm_aws_region: str | None = None,
       aws_session: AwsCredentialsProvider | None = None,
   ) -> None:
     self._base_url = base_url.rstrip("/")
@@ -99,6 +97,13 @@ class LlmClient:
         )
 
     elif self._authentication == LlmAuthentication.AWS_SIGV4:
+      region = llm_aws_region.strip() if llm_aws_region and llm_aws_region.strip() else None
+      if not region:
+        raise LlmConfigurationError(
+          "An AWS region is required when LlmAuthentication.AWS_SIGV4 is "
+          "configured"
+        )
+
       session = aws_session if aws_session is not None else BotocoreSession()
 
       credentials = session.get_credentials()
@@ -107,20 +112,6 @@ class LlmClient:
           "No AWS credentials were found for LlmAuthentication.AWS_SIGV4. "
           "Configure the standard AWS credential provider chain, for "
           "example an ECS task role."
-        )
-
-      # botocore's own "region" config variable only resolves AWS_REGION via
-      # the AWS_DEFAULT_REGION environment variable (and shared config
-      # files); AWS_REGION is checked explicitly first since ECS/Fargate
-      # tasks commonly set that instead.
-      region = (
-          os.environ.get("AWS_REGION")
-          or session.get_config_variable("region")
-      )
-      if not region:
-        raise LlmConfigurationError(
-          "No AWS region was found for LlmAuthentication.AWS_SIGV4. Set "
-          "AWS_REGION or AWS_DEFAULT_REGION."
         )
 
       self._aws_credentials = credentials

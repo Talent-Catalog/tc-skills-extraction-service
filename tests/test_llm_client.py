@@ -44,23 +44,19 @@ class FakeAwsCredentials:
 
 class FakeAwsSession:
   """
-  A minimal stand-in for botocore.session.Session, exposing only the two
-  methods LlmClient relies on for AWS_SIGV4.
+  A minimal stand-in for botocore.session.Session, exposing only the one
+  method LlmClient relies on for AWS_SIGV4: credential discovery. The region
+  is supplied to LlmClient directly, not discovered through the session.
   """
 
   def __init__(
       self,
       credentials: FakeAwsCredentials | None,
-      region: str | None,
   ) -> None:
     self._credentials = credentials
-    self._region = region
 
   def get_credentials(self) -> FakeAwsCredentials | None:
     return self._credentials
-
-  def get_config_variable(self, name: str) -> str | None:
-    return self._region if name == "region" else None
 
 
 class CreateLlmClient(Protocol):
@@ -74,6 +70,7 @@ class CreateLlmClient(Protocol):
       model_name: str = "test-model",
       authentication: LlmAuthentication = LlmAuthentication.NONE,
       api_key: str | None = None,
+      llm_aws_region: str | None = None,
       aws_session: AwsCredentialsProvider | None = None,
   ) -> LlmClient:
     """Create an LLM client using the supplied test transport."""
@@ -95,6 +92,7 @@ def create_client() -> Generator[
       model_name: str = "test-model",
       authentication: LlmAuthentication = LlmAuthentication.NONE,
       api_key: str | None = None,
+      llm_aws_region: str | None = None,
       aws_session: AwsCredentialsProvider | None = None,
   ) -> LlmClient:
     http_client = httpx.Client(transport=transport)
@@ -106,6 +104,7 @@ def create_client() -> Generator[
       http_client=http_client,
       authentication=authentication,
       api_key=api_key,
+      llm_aws_region=llm_aws_region,
       aws_session=aws_session,
     )
 
@@ -230,12 +229,12 @@ def test_aws_sigv4_signs_the_request_and_handles_session_token(
       secret_key="secret",
       token="session-token-abc",
     ),
-    region="eu-west-2",
   )
 
   result = create_client(
     httpx.MockTransport(handler),
     authentication=LlmAuthentication.AWS_SIGV4,
+    llm_aws_region="eu-west-2",
     aws_session=aws_session,
   ).generate("system", "evidence")
 
@@ -261,12 +260,12 @@ def test_aws_sigv4_signature_depends_on_the_request_body(
       access_key="AKIA_TEST",
       secret_key="secret",
     ),
-    region="eu-west-2",
   )
 
   client = create_client(
     httpx.MockTransport(handler),
     authentication=LlmAuthentication.AWS_SIGV4,
+    llm_aws_region="eu-west-2",
     aws_session=aws_session,
   )
 
@@ -289,12 +288,12 @@ def test_aws_sigv4_uses_the_configured_region_not_a_hardcoded_one(
       access_key="AKIA_TEST",
       secret_key="secret",
     ),
-    region="us-east-1",
   )
 
   create_client(
     httpx.MockTransport(handler),
     authentication=LlmAuthentication.AWS_SIGV4,
+    llm_aws_region="us-east-1",
     aws_session=aws_session,
   ).generate("system", "evidence")
 
@@ -302,7 +301,7 @@ def test_aws_sigv4_uses_the_configured_region_not_a_hardcoded_one(
 def test_aws_sigv4_without_credentials_raises_configuration_error(
     create_client: CreateLlmClient,
 ) -> None:
-  aws_session = FakeAwsSession(credentials=None, region="eu-west-2")
+  aws_session = FakeAwsSession(credentials=None)
 
   with pytest.raises(
       LlmConfigurationError,
@@ -311,30 +310,51 @@ def test_aws_sigv4_without_credentials_raises_configuration_error(
     create_client(
       httpx.MockTransport(lambda request: _success_response()),
       authentication=LlmAuthentication.AWS_SIGV4,
+      llm_aws_region="eu-west-2",
       aws_session=aws_session,
     )
 
 
+@pytest.mark.parametrize("llm_aws_region", [None, "", "   "])
 def test_aws_sigv4_without_region_raises_configuration_error(
     create_client: CreateLlmClient,
-    monkeypatch: pytest.MonkeyPatch,
+    llm_aws_region: str | None,
 ) -> None:
-  monkeypatch.delenv("AWS_REGION", raising=False)
-
   aws_session = FakeAwsSession(
     credentials=FakeAwsCredentials(access_key="AKIA_TEST", secret_key="secret"),
-    region=None,
   )
 
   with pytest.raises(
       LlmConfigurationError,
-      match="No AWS region was found",
+      match="An AWS region is required",
   ):
     create_client(
       httpx.MockTransport(lambda request: _success_response()),
       authentication=LlmAuthentication.AWS_SIGV4,
+      llm_aws_region=llm_aws_region,
       aws_session=aws_session,
     )
+
+
+def test_none_authentication_requires_no_aws_credentials_or_region(
+    create_client: CreateLlmClient,
+) -> None:
+  """
+  NONE must not touch AWS credential discovery at all: a session that would
+  fail if queried proves it was never consulted.
+  """
+  class ExplodingAwsSession:
+    def get_credentials(self) -> Any:
+      raise AssertionError("NONE must not query AWS credentials")
+
+  result = create_client(
+    httpx.MockTransport(lambda request: _success_response()),
+    authentication=LlmAuthentication.NONE,
+    llm_aws_region=None,
+    aws_session=ExplodingAwsSession(),
+  ).generate("system", "evidence")
+
+  assert result == "generated content"
 
 
 def test_http_failure_raises_service_unavailable_without_exposing_key(
