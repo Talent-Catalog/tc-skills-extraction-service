@@ -3,6 +3,8 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import AnyHttpUrl, Field
 
+from app.services.llm_client import LlmAuthentication
+
 # Settings for the application. These are loaded from environment variables or
 # a .env file.
 class Settings(BaseSettings):
@@ -10,6 +12,7 @@ class Settings(BaseSettings):
 
   llm_base_url: str ="https://bedrock-runtime.eu-west-2.amazonaws.com/openai/v1"
   llm_model_name: str ="qwen.qwen3-235b-a22b-2507-v1:0"
+  llm_authentication: LlmAuthentication = LlmAuthentication.NONE
   llm_api_key: str | None = None
   llm_request_timeout_seconds: float = Field(default=60.0, gt=0)
 
