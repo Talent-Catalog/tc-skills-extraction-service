@@ -8,8 +8,8 @@ from pydantic import AnyHttpUrl, Field
 class Settings(BaseSettings):
   SKILLS_BASE_URL: AnyHttpUrl
 
-  llm_base_url: str = "http://localhost:8001/v1"
-  llm_model_name: str = "Qwen/Qwen3-8B"
+  llm_base_url: str ="https://bedrock-runtime.eu-west-2.amazonaws.com/openai/v1"
+  llm_model_name: str ="qwen.qwen3-235b-a22b-2507-v1:0"
   llm_api_key: str | None = None
   llm_request_timeout_seconds: float = Field(default=60.0, gt=0)
 
