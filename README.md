@@ -23,29 +23,79 @@ a terminal.
 
 ## LLM configuration
 
-The explanation API uses an OpenAI-compatible Chat Completions endpoint. A
-local inference server such as vLLM can be configured with:
+The explanation API uses an OpenAI-compatible Chat Completions endpoint,
+talking to Amazon Bedrock's OpenAI-compatible endpoint by default. `LlmClient`
+itself (`app/services/llm_client.py`) is provider-independent and supports
+three authentication modes (`LlmAuthentication`): `AWS_SIGV4` (the default),
+`BEARER`, and `NONE`.
+
+### Local development: no configuration needed
+
+If you have an AWS user or role authorised to invoke the configured Bedrock
+model, **you don't need to set any `LLM_*` environment variables at all.**
+Leave every setting at its default and the service will:
+
+- authenticate with AWS Signature Version 4 (`LLM_AUTHENTICATION` defaults to
+  `AWS_SIGV4`), using your normal AWS credentials from the standard AWS
+  credential provider chain (environment variables, `~/.aws/credentials`,
+  SSO login, etc. - whatever `aws sts get-caller-identity` already resolves
+  for you);
+- call Amazon Bedrock's OpenAI-compatible endpoint in `eu-west-2`
+  (`LLM_AWS_REGION` defaults to `eu-west-2`, and `LLM_BASE_URL` defaults to
+  `None`, which `main.py` turns into
+  `https://bedrock-runtime.eu-west-2.amazonaws.com/openai/v1`);
+  and use the default `LLM_MODEL_NAME`.
+
+All you need to do is make sure your AWS user/role has been granted access
+to that model in the Bedrock console (Bedrock model access is per-region and
+per-model, separate from general AWS permissions) and has an IAM policy
+allowing `bedrock:InvokeModel`/`bedrock:InvokeModelWithResponseStream` (or
+equivalent) for it. No API key, and no local `.env` entries, are required.
+
+If your AWS credentials are for a region other than `eu-west-2`, or your
+Bedrock model access was granted in a different region, override just the
+region and both the signing region and the default endpoint URL follow it:
+
+```dotenv
+LLM_AWS_REGION=us-east-1
+```
+
+### Alternative: BEARER (a short-term Bedrock API key)
+
+Useful when you don't have (or don't want to use) local AWS credentials, or
+for diagnosing whether a problem is SigV4-specific:
+
+```dotenv
+LLM_AUTHENTICATION=BEARER
+LLM_API_KEY=<short-term Bedrock API key>
+```
+
+Generate a short-term key from the Bedrock console, e.g.
+https://eu-west-2.console.aws.amazon.com/bedrock/home?region=eu-west-2#/api-keys?tab=short-term.
+`LLM_API_KEY` must be supplied through a secret-management mechanism (or a
+local, untracked `.env`) rather than committed to source control.
+
+### Alternative: NONE (an unauthenticated OpenAI-compatible server)
+
+For a locally hosted inference server such as vLLM that requires no
+authentication:
 
 ```dotenv
 LLM_BASE_URL=http://localhost:8001/v1
+LLM_AUTHENTICATION=NONE
 LLM_MODEL_NAME=mlx-community/Qwen3-8B-4bit
-LLM_API_KEY=
 LLM_REQUEST_TIMEOUT_SECONDS=120
 ```
 
-Amazon Bedrock's OpenAI-compatible endpoint can be selected using only
-environment configuration:
+`LLM_AWS_REGION` is irrelevant here (AWS signing isn't used) and can be left
+at its default.
 
-```dotenv
-LLM_BASE_URL=https://bedrock-mantle.<aws-region>.api.aws/v1
-LLM_MODEL_NAME=<configured-bedrock-model-id>
-LLM_API_KEY=<bedrock-api-key>
-LLM_REQUEST_TIMEOUT_SECONDS=120
-```
+### Production (ECS/Fargate)
 
-`LLM_API_KEY` is optional. When configured, it is sent as a bearer token and
-must be supplied through a secret-management mechanism rather than committed
-to source control.
+Production uses the same `AWS_SIGV4` path, with credentials coming from the
+ECS task role via the same standard AWS credential provider chain - no
+`LLM_API_KEY` is configured in production. `LLM_AWS_REGION` only needs
+setting there if the deployment region differs from the `eu-west-2` default.
 
 ## CV extraction (POST /extract_candidate_occupations)
 
