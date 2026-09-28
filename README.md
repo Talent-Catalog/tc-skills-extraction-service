@@ -1,9 +1,12 @@
 # tc-skills-extraction-service
-FastAPI Python service for extracting skills from text
+FastAPI Python service for extracting skills from text, doing vector embeddings, providing
+LLM based explanations for job/candidate matchings.
+
+### `todo` - Rename this service  
 
 ## 🐳 Local Docker build & run
 
-To build and run the Skills Extraction Service locally:
+To build and run the service locally:
 
 ### Build the image
 ```bash
