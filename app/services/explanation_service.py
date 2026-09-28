@@ -23,8 +23,8 @@ class ExplanationService:
   Explanations are grounded only in the supplied texts and do not use hybrid
   search ranks, scores, or vector similarities.
 
-  The separately hosted Qwen inference process owns model resources, keeping
-  this API process lightweight and independently scalable.
+  LLM inference is provided by a separately hosted OpenAI-compatible
+  service, keeping this API process lightweight and independently scalable.
   """
 
   SYSTEM_PROMPT = """

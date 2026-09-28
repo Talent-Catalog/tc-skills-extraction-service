@@ -97,8 +97,8 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
 
   # noinspection PyArgumentList
   settings = Settings()
-  # Qwen runs behind a separate OpenAI-compatible inference server so model
-  # resources are not loaded into this FastAPI process.
+  # LLM inference is provided by a separately hosted OpenAI-compatible
+  # service, so model resources are not loaded into this FastAPI process.
   llm_http_client = httpx.Client()
   llm_client = LlmClient(
     base_url=settings.llm_base_url,
