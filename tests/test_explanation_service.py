@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from typing import cast
 from unittest.mock import Mock
@@ -8,14 +9,22 @@ import httpx
 import pytest
 
 from app.models.explanation_models import (
+  BatchCandidateExplanation,
   CandidateExperience,
+  ExplanationErrorCode,
   ExplanationRequest,
+  ExplanationsRequest,
 )
 from app.services.explanation_service import (
   ExplanationGenerationError,
   ExplanationService,
 )
-from app.services.llm_client import LlmClient, LlmResult, LlmUsage
+from app.services.llm_client import (
+  LlmClient,
+  LlmResult,
+  LlmServiceUnavailableError,
+  LlmUsage,
+)
 
 
 class FakeLlmClient(LlmClient):
@@ -61,6 +70,51 @@ VALID_GENERATED_CONTENT = """{
   ],
   "limitations": ["The supplied text does not cover every requirement."]
 }"""
+
+
+def _valid_content(candidate_id: str, experience_id: str) -> str:
+  """Build generated JSON that echoes back the given IDs, as the LLM would."""
+  return json.dumps({
+    "candidate_id": candidate_id,
+    "summary": f"Summary for {candidate_id}.",
+    "experience_explanations": [
+      {
+        "experience_id": experience_id,
+        "explanation": f"Explanation for {experience_id}.",
+      }
+    ],
+    "limitations": [],
+  })
+
+
+class ScriptedLlmClient(LlmClient):
+  """
+  Returns a scripted sequence of results (or raises a scripted exception)
+  from generate(), one per call, in order - so each candidate in a batch
+  can be given its own outcome.
+  """
+
+  def __init__(self, outcomes: list[LlmResult | Exception]) -> None:
+    super().__init__(
+      base_url="http://llm.test/v1",
+      model_name="test-model",
+      timeout=1.0,
+      http_client=cast(
+        httpx.Client,
+        Mock(spec=httpx.Client),
+      ),
+    )
+    self._outcomes = list(outcomes)
+    self.user_prompts: list[str] = []
+
+  def generate(self, system_prompt: str, user_prompt: str) -> LlmResult:
+    self.user_prompts.append(user_prompt)
+    outcome = self._outcomes.pop(0)
+
+    if isinstance(outcome, Exception):
+      raise outcome
+
+    return outcome
 
 
 @pytest.fixture
@@ -178,6 +232,185 @@ def test_generated_candidate_id_must_match_request(
     ExplanationService(
       FakeLlmClient(content)
     ).generate_explanation(explanation_request)
+
+
+def _batch_candidate(candidate_id: str, experience_id: str) -> BatchCandidateExplanation:
+  return BatchCandidateExplanation(
+    candidate_id=candidate_id,
+    experiences=[
+      CandidateExperience(
+        experience_id=experience_id,
+        job_title="Accountant",
+        description="Prepared monthly financial reports.",
+      )
+    ],
+  )
+
+
+def test_generate_explanations_returns_a_result_per_candidate_in_order(
+) -> None:
+  llm_client = ScriptedLlmClient([
+    LlmResult(
+      content=_valid_content("candidate-1", "experience-1"),
+      usage=LlmUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+    ),
+    LlmResult(
+      content=_valid_content("candidate-2", "experience-2"),
+      usage=LlmUsage(prompt_tokens=3, completion_tokens=3, total_tokens=6),
+    ),
+  ])
+
+  request = ExplanationsRequest(
+    opportunity_description="Seeking an accountant.",
+    candidates=[
+      _batch_candidate("candidate-1", "experience-1"),
+      _batch_candidate("candidate-2", "experience-2"),
+    ],
+  )
+
+  response = ExplanationService(llm_client).generate_explanations(request)
+
+  assert response.requested == 2
+  assert response.succeeded == 2
+  assert response.failed == 0
+
+  assert [result.candidate_id for result in response.results] == [
+    "candidate-1",
+    "candidate-2",
+  ]
+  assert response.results[0].error is None
+  assert response.results[0].summary == "Summary for candidate-1."
+  assert (
+    response.results[0].experience_explanations[0].experience_id
+    == "experience-1"
+  )
+  assert response.results[1].summary == "Summary for candidate-2."
+
+
+def test_generate_explanations_one_candidate_failure_does_not_fail_others(
+) -> None:
+  """
+  A candidate whose LLM call fails entirely (LlmServiceUnavailableError) is
+  reported as an item-level LLM_SERVICE_UNAVAILABLE error, without
+  preventing the surrounding candidates from succeeding.
+  """
+  llm_client = ScriptedLlmClient([
+    LlmResult(
+      content=_valid_content("candidate-1", "experience-1"),
+      usage=LlmUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+    ),
+    LlmServiceUnavailableError("The LLM service is unavailable"),
+    LlmResult(
+      content=_valid_content("candidate-3", "experience-3"),
+      usage=LlmUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+    ),
+  ])
+
+  request = ExplanationsRequest(
+    opportunity_description="Seeking an accountant.",
+    candidates=[
+      _batch_candidate("candidate-1", "experience-1"),
+      _batch_candidate("candidate-2", "experience-2"),
+      _batch_candidate("candidate-3", "experience-3"),
+    ],
+  )
+
+  response = ExplanationService(llm_client).generate_explanations(request)
+
+  assert response.requested == 3
+  assert response.succeeded == 2
+  assert response.failed == 1
+
+  assert [result.candidate_id for result in response.results] == [
+    "candidate-1",
+    "candidate-2",
+    "candidate-3",
+  ]
+
+  failed_result = response.results[1]
+  assert failed_result.error.code == ExplanationErrorCode.LLM_SERVICE_UNAVAILABLE
+  assert "unavailable" in failed_result.error.message
+  assert failed_result.summary is None
+
+  assert response.results[0].summary == "Summary for candidate-1."
+  assert response.results[2].summary == "Summary for candidate-3."
+
+
+def test_generate_explanations_invalid_llm_output_is_an_item_level_error(
+) -> None:
+  """
+  A candidate whose LLM call succeeds but returns unusable content is
+  reported as an item-level INVALID_LLM_OUTPUT error - distinct from a
+  wholesale LLM service outage.
+  """
+  llm_client = ScriptedLlmClient([
+    LlmResult(
+      content="not JSON",
+      usage=LlmUsage(prompt_tokens=5, completion_tokens=5, total_tokens=10),
+    ),
+  ])
+
+  request = ExplanationsRequest(
+    opportunity_description="Seeking an accountant.",
+    candidates=[_batch_candidate("candidate-1", "experience-1")],
+  )
+
+  response = ExplanationService(llm_client).generate_explanations(request)
+
+  assert response.failed == 1
+  assert (
+    response.results[0].error.code == ExplanationErrorCode.INVALID_LLM_OUTPUT
+  )
+
+
+def test_generate_explanations_logs_token_usage_for_every_candidate(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+  llm_client = ScriptedLlmClient([
+    LlmResult(
+      content=_valid_content("candidate-1", "experience-1"),
+      usage=LlmUsage(prompt_tokens=101, completion_tokens=201, total_tokens=302),
+    ),
+    LlmResult(
+      content=_valid_content("candidate-2", "experience-2"),
+      usage=LlmUsage(prompt_tokens=103, completion_tokens=203, total_tokens=306),
+    ),
+  ])
+
+  request = ExplanationsRequest(
+    opportunity_description="Seeking an accountant.",
+    candidates=[
+      _batch_candidate("candidate-1", "experience-1"),
+      _batch_candidate("candidate-2", "experience-2"),
+    ],
+  )
+
+  with caplog.at_level(logging.INFO):
+    ExplanationService(llm_client).generate_explanations(request)
+
+  assert "candidate-1" in caplog.text
+  assert "302" in caplog.text
+  assert "candidate-2" in caplog.text
+  assert "306" in caplog.text
+
+
+def test_generate_explanations_empty_candidate_list_is_rejected() -> None:
+  with pytest.raises(ValueError):
+    ExplanationsRequest(
+      opportunity_description="Seeking an accountant.",
+      candidates=[],
+    )
+
+
+def test_generate_explanations_duplicate_candidate_ids_are_rejected() -> None:
+  with pytest.raises(ValueError, match="unique"):
+    ExplanationsRequest(
+      opportunity_description="Seeking an accountant.",
+      candidates=[
+        _batch_candidate("candidate-1", "experience-1"),
+        _batch_candidate("candidate-1", "experience-2"),
+      ],
+    )
 
 
 def test_generated_experience_ids_must_match_request(
