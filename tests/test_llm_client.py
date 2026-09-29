@@ -14,6 +14,7 @@ from app.services.llm_client import (
   LlmClient,
   LlmConfigurationError,
   LlmServiceUnavailableError,
+  LlmUsage,
   MalformedLlmResponseError,
 )
 
@@ -120,7 +121,12 @@ def _success_response() -> httpx.Response:
     json={
       "choices": [
         {"message": {"content": "generated content"}}
-      ]
+      ],
+      "usage": {
+        "prompt_tokens": 11,
+        "completion_tokens": 22,
+        "total_tokens": 33,
+      },
     },
   )
 
@@ -149,7 +155,82 @@ def test_extracts_assistant_message_content(
     model_name="configured-model",
   ).generate("system", "evidence")
 
-  assert result == "generated content"
+  assert result.content == "generated content"
+
+
+def test_parses_reported_token_usage(
+    create_client: CreateLlmClient,
+) -> None:
+  result = create_client(
+    httpx.MockTransport(lambda request: _success_response())
+  ).generate("system", "evidence")
+
+  assert result.usage == LlmUsage(
+    prompt_tokens=11,
+    completion_tokens=22,
+    total_tokens=33,
+  )
+
+
+def test_partially_reported_token_usage_keeps_the_reported_counts(
+    create_client: CreateLlmClient,
+) -> None:
+  def handler(request: httpx.Request) -> httpx.Response:
+    return httpx.Response(
+      200,
+      json={
+        "choices": [{"message": {"content": "generated content"}}],
+        "usage": {"prompt_tokens": 7},
+      },
+    )
+
+  result = create_client(
+    httpx.MockTransport(handler)
+  ).generate("system", "evidence")
+
+  assert result.usage == LlmUsage(
+    prompt_tokens=7,
+    completion_tokens=0,
+    total_tokens=0,
+  )
+
+
+@pytest.mark.parametrize(
+  "usage_payload",
+  [
+    pytest.param({}, id="no-usage-key"),
+    pytest.param({"usage": {}}, id="empty-usage"),
+    pytest.param({"usage": {"prompt_tokens": None}}, id="null-count"),
+    pytest.param({"usage": "not an object"}, id="non-object-usage"),
+  ],
+)
+def test_unreported_token_usage_is_zero(
+    create_client: CreateLlmClient,
+    usage_payload: dict[str, Any],
+) -> None:
+  """
+  Usage is not guaranteed by every OpenAI-compatible server, so a missing or
+  unreadable usage object must not fail an otherwise successful generation.
+  """
+  def handler(request: httpx.Request) -> httpx.Response:
+    return httpx.Response(
+      200,
+      json={
+        "choices": [{"message": {"content": "generated content"}}],
+        **usage_payload,
+      },
+    )
+
+  result = create_client(
+    httpx.MockTransport(handler)
+  ).generate("system", "evidence")
+
+  assert result.content == "generated content"
+  assert result.usage == LlmUsage(
+    prompt_tokens=0,
+    completion_tokens=0,
+    total_tokens=0,
+  )
 
 
 @pytest.mark.parametrize("api_key", [None, "", "   ", "unused-key"])
@@ -171,7 +252,7 @@ def test_none_authentication_sends_no_authorization_header(
     api_key=api_key,
   ).generate("system", "evidence")
 
-  assert result == "generated content"
+  assert result.content == "generated content"
 
 
 def test_bearer_authentication_sends_bearer_authorization(
@@ -187,7 +268,7 @@ def test_bearer_authentication_sends_bearer_authorization(
     api_key="secret-api-key",
   ).generate("system", "evidence")
 
-  assert result == "generated content"
+  assert result.content == "generated content"
 
 
 @pytest.mark.parametrize("api_key", [None, "", "   "])
@@ -238,7 +319,7 @@ def test_aws_sigv4_signs_the_request_and_handles_session_token(
     aws_session=aws_session,
   ).generate("system", "evidence")
 
-  assert result == "generated content"
+  assert result.content == "generated content"
 
 
 def test_aws_sigv4_signature_depends_on_the_request_body(
@@ -354,7 +435,7 @@ def test_none_authentication_requires_no_aws_credentials_or_region(
     aws_session=ExplodingAwsSession(),
   ).generate("system", "evidence")
 
-  assert result == "generated content"
+  assert result.content == "generated content"
 
 
 def test_http_failure_raises_service_unavailable_without_exposing_key(

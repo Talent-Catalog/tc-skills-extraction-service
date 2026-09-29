@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import cast
 from unittest.mock import Mock
 
@@ -14,13 +15,21 @@ from app.services.explanation_service import (
   ExplanationGenerationError,
   ExplanationService,
 )
-from app.services.llm_client import LlmClient
+from app.services.llm_client import LlmClient, LlmResult, LlmUsage
 
 
 class FakeLlmClient(LlmClient):
   """Return predefined model content without making an HTTP request."""
 
-  def __init__(self, content: str) -> None:
+  def __init__(
+      self,
+      content: str,
+      usage: LlmUsage = LlmUsage(
+        prompt_tokens=11,
+        completion_tokens=22,
+        total_tokens=33,
+      ),
+  ) -> None:
     super().__init__(
       base_url="http://llm.test/v1",
       model_name="test-model",
@@ -31,13 +40,27 @@ class FakeLlmClient(LlmClient):
       ),
     )
     self.content = content
+    self.usage = usage
     self.system_prompt: str | None = None
     self.user_prompt: str | None = None
 
-  def generate(self, system_prompt: str, user_prompt: str) -> str:
+  def generate(self, system_prompt: str, user_prompt: str) -> LlmResult:
     self.system_prompt = system_prompt
     self.user_prompt = user_prompt
-    return self.content
+    return LlmResult(content=self.content, usage=self.usage)
+
+
+VALID_GENERATED_CONTENT = """{
+  "candidate_id": "candidate-1",
+  "summary": "The supplied experience includes relevant work.",
+  "experience_explanations": [
+    {
+      "experience_id": "experience-1",
+      "explanation": "Financial reporting relates to the opportunity."
+    }
+  ],
+  "limitations": ["The supplied text does not cover every requirement."]
+}"""
 
 
 @pytest.fixture
@@ -59,19 +82,7 @@ def explanation_request() -> ExplanationRequest:
 def test_validates_successful_generated_json(
     explanation_request: ExplanationRequest,
 ) -> None:
-  llm_client = FakeLlmClient(
-    """{
-      "candidate_id": "candidate-1",
-      "summary": "The supplied experience includes relevant work.",
-      "experience_explanations": [
-        {
-          "experience_id": "experience-1",
-          "explanation": "Financial reporting relates to the opportunity."
-        }
-      ],
-      "limitations": ["The supplied text does not cover every requirement."]
-    }"""
-  )
+  llm_client = FakeLlmClient(VALID_GENERATED_CONTENT)
 
   response = ExplanationService(llm_client).generate_explanation(
     explanation_request
@@ -85,6 +96,49 @@ def test_validates_successful_generated_json(
   assert "search rankings" in llm_client.system_prompt
   assert "candidate_score" not in llm_client.user_prompt
   assert "similarity" not in llm_client.user_prompt
+
+
+def test_token_usage_is_logged(
+    explanation_request: ExplanationRequest,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+  llm_client = FakeLlmClient(
+    VALID_GENERATED_CONTENT,
+    usage=LlmUsage(
+      prompt_tokens=101,
+      completion_tokens=202,
+      total_tokens=303,
+    ),
+  )
+
+  with caplog.at_level(logging.INFO):
+    ExplanationService(llm_client).generate_explanation(explanation_request)
+
+  assert "candidate-1" in caplog.text
+  assert "101" in caplog.text
+  assert "202" in caplog.text
+  assert "303" in caplog.text
+
+
+def test_token_usage_is_logged_even_when_the_response_is_invalid(
+    explanation_request: ExplanationRequest,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+  """The tokens were spent whether or not the generated JSON validates."""
+  llm_client = FakeLlmClient(
+    "not JSON",
+    usage=LlmUsage(
+      prompt_tokens=101,
+      completion_tokens=202,
+      total_tokens=303,
+    ),
+  )
+
+  with caplog.at_level(logging.INFO):
+    with pytest.raises(ExplanationGenerationError):
+      ExplanationService(llm_client).generate_explanation(explanation_request)
+
+  assert "303" in caplog.text
 
 
 def test_invalid_generated_json_raises_error(

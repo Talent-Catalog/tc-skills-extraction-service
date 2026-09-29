@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Protocol
 
@@ -53,6 +54,28 @@ class LlmConfigurationError(RuntimeError):
   Raised when LlmClient is configured with an invalid or incomplete
   authentication setup.
   """
+
+
+@dataclass(frozen=True)
+class LlmUsage:
+  """
+  The token usage reported by one chat completion.
+
+  Counts are recorded as reported, without any monetary cost calculation:
+  costs are worked out externally from the logged usage.
+  """
+
+  prompt_tokens: int
+  completion_tokens: int
+  total_tokens: int
+
+
+@dataclass(frozen=True)
+class LlmResult:
+  """One generated chat completion and the token usage it reported."""
+
+  content: str
+  usage: LlmUsage
 
 
 class LlmClient:
@@ -121,7 +144,7 @@ class LlmClient:
       self,
       system_prompt: str,
       user_prompt: str,
-  ) -> str:
+  ) -> LlmResult:
     """Generate assistant message content from the supplied prompts."""
     url = f"{self._base_url}/chat/completions"
 
@@ -169,7 +192,35 @@ class LlmClient:
         "The LLM service returned empty or non-text assistant content"
       )
 
-    return content
+    return LlmResult(
+      content=content,
+      usage=self._parse_usage(payload),
+    )
+
+  @classmethod
+  def _parse_usage(cls, payload: Any) -> LlmUsage:
+    """
+    Read the token usage reported alongside a chat completion.
+
+    Usage is not guaranteed by every OpenAI-compatible server, so a missing
+    or unreadable usage object is reported as zero counts rather than
+    failing an otherwise successful generation.
+    """
+    usage = payload.get("usage") if isinstance(payload, dict) else None
+
+    if not isinstance(usage, dict):
+      usage = {}
+
+    return LlmUsage(
+      prompt_tokens=cls._token_count(usage.get("prompt_tokens")),
+      completion_tokens=cls._token_count(usage.get("completion_tokens")),
+      total_tokens=cls._token_count(usage.get("total_tokens")),
+    )
+
+  @staticmethod
+  def _token_count(value: Any) -> int:
+    """Return one reported token count, ignoring non-integer values."""
+    return value if isinstance(value, int) else 0
 
   def _build_headers(
       self,

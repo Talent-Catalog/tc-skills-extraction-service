@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 import json
+import logging
 
 from pydantic import ValidationError
 
@@ -10,6 +11,8 @@ from app.models.explanation_models import (
   ExplanationResponse,
 )
 from app.services.llm_client import LlmClient
+
+logger = logging.getLogger(__name__)
 
 
 class ExplanationGenerationError(RuntimeError):
@@ -62,13 +65,23 @@ Preserve the supplied candidate_id and experience_id values exactly.
       f"{request.model_dump_json()}"
     )
 
-    content = self._llm_client.generate(
+    result = self._llm_client.generate(
       system_prompt=self.SYSTEM_PROMPT,
       user_prompt=user_prompt,
     )
 
+    # Logged before validation because the tokens were spent either way.
+    logger.info(
+      "Explanation generated for candidate %s using %d prompt tokens, "
+      "%d completion tokens, %d tokens in total.",
+      request.candidate_id,
+      result.usage.prompt_tokens,
+      result.usage.completion_tokens,
+      result.usage.total_tokens,
+    )
+
     try:
-      parsed = json.loads(content)
+      parsed = json.loads(result.content)
       response = ExplanationResponse.model_validate(parsed)
     except (json.JSONDecodeError, ValidationError, TypeError) as exception:
       raise ExplanationGenerationError(
