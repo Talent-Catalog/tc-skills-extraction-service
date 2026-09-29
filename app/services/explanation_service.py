@@ -16,6 +16,7 @@ from app.models.explanation_models import (
   ExplanationsRequest,
   ExplanationsResponse,
 )
+from app.services.html_utils import html_to_readable_text
 from app.services.llm_client import (
   LlmClient,
   LlmServiceUnavailableError,
@@ -69,10 +70,12 @@ Preserve the supplied candidate_id and experience_id values exactly.
       request: ExplanationRequest,
   ) -> ExplanationResponse:
     """Compare the supplied texts and validate the generated explanation."""
+    cleaned_request = self._clean_request_text(request)
+
     user_prompt = (
       "Compare these candidate experiences with the opportunity using only "
       "the supplied text:\n"
-      f"{request.model_dump_json()}"
+      f"{cleaned_request.model_dump_json()}"
     )
 
     result = self._llm_client.generate(
@@ -207,3 +210,31 @@ Preserve the supplied candidate_id and experience_id values exactly.
         message=message,
       ),
     )
+
+  @staticmethod
+  def _clean_request_text(request: ExplanationRequest) -> ExplanationRequest:
+    """
+    Return a copy of the request with HTML stripped from its free-text
+    fields, without mutating the caller's original request object.
+
+    IDs are never touched, so this has no effect on the candidate_id/
+    experience_id matching that generate_explanation() performs afterwards.
+    """
+    cleaned_experiences = [
+      experience.model_copy(update={
+        "description": html_to_readable_text(experience.description),
+        "job_title": (
+          html_to_readable_text(experience.job_title)
+          if experience.job_title is not None
+          else None
+        ),
+      })
+      for experience in request.experiences
+    ]
+
+    return request.model_copy(update={
+      "opportunity_description": html_to_readable_text(
+        request.opportunity_description
+      ),
+      "experiences": cleaned_experiences,
+    })

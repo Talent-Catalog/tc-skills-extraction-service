@@ -234,6 +234,70 @@ def test_generated_candidate_id_must_match_request(
     ).generate_explanation(explanation_request)
 
 
+def test_html_is_stripped_from_the_llm_prompt() -> None:
+  """
+  HTML in opportunity_description, description and job_title must be
+  converted to readable text before it reaches the LLM prompt.
+  """
+  request = ExplanationRequest(
+    candidate_id="candidate-1",
+    opportunity_description=(
+      "<p>Java developer</p><ul><li>Spring Boot</li><li>PostgreSQL</li></ul>"
+    ),
+    experiences=[
+      CandidateExperience(
+        experience_id="experience-1",
+        job_title="<strong>Senior</strong> Accountant",
+        description="<p>Prepared <em>monthly</em> financial reports.</p>",
+      )
+    ],
+  )
+
+  llm_client = FakeLlmClient(VALID_GENERATED_CONTENT)
+
+  ExplanationService(llm_client).generate_explanation(request)
+
+  assert "<p>" not in llm_client.user_prompt
+  assert "<li>" not in llm_client.user_prompt
+  assert "<strong>" not in llm_client.user_prompt
+  assert "<em>" not in llm_client.user_prompt
+  assert "Java developer" in llm_client.user_prompt
+  assert "Spring Boot" in llm_client.user_prompt
+  assert "PostgreSQL" in llm_client.user_prompt
+  assert "Senior Accountant" in llm_client.user_prompt
+  assert "Prepared monthly financial reports." in llm_client.user_prompt
+  # IDs are untouched by cleaning.
+  assert "candidate-1" in llm_client.user_prompt
+  assert "experience-1" in llm_client.user_prompt
+
+
+def test_html_cleaning_does_not_mutate_the_original_request() -> None:
+  """The caller's Pydantic request object must not be modified in place."""
+  original_description = "<p>Prepared <em>monthly</em> financial reports.</p>"
+  original_job_title = "<strong>Senior</strong> Accountant"
+  original_opportunity_description = "<p>Java developer</p>"
+
+  request = ExplanationRequest(
+    candidate_id="candidate-1",
+    opportunity_description=original_opportunity_description,
+    experiences=[
+      CandidateExperience(
+        experience_id="experience-1",
+        job_title=original_job_title,
+        description=original_description,
+      )
+    ],
+  )
+
+  ExplanationService(FakeLlmClient(VALID_GENERATED_CONTENT)).generate_explanation(
+    request
+  )
+
+  assert request.opportunity_description == original_opportunity_description
+  assert request.experiences[0].description == original_description
+  assert request.experiences[0].job_title == original_job_title
+
+
 def _batch_candidate(candidate_id: str, experience_id: str) -> BatchCandidateExplanation:
   return BatchCandidateExplanation(
     candidate_id=candidate_id,
@@ -285,6 +349,67 @@ def test_generate_explanations_returns_a_result_per_candidate_in_order(
     == "experience-1"
   )
   assert response.results[1].summary == "Summary for candidate-2."
+
+
+def test_generate_explanations_strips_html_for_every_candidate() -> None:
+  """
+  HTML must be cleaned independently for every candidate's own experiences
+  before its own (separate) LLM call - not just the first one in the batch.
+  """
+  llm_client = ScriptedLlmClient([
+    LlmResult(
+      content=_valid_content("candidate-1", "experience-1"),
+      usage=LlmUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+    ),
+    LlmResult(
+      content=_valid_content("candidate-2", "experience-2"),
+      usage=LlmUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+    ),
+  ])
+
+  request = ExplanationsRequest(
+    opportunity_description="<p>Java developer</p><ul><li>Spring Boot</li></ul>",
+    candidates=[
+      BatchCandidateExplanation(
+        candidate_id="candidate-1",
+        experiences=[
+          CandidateExperience(
+            experience_id="experience-1",
+            job_title="<strong>Senior</strong> Accountant",
+            description="<p>Prepared <em>monthly</em> reports.</p>",
+          )
+        ],
+      ),
+      BatchCandidateExplanation(
+        candidate_id="candidate-2",
+        experiences=[
+          CandidateExperience(
+            experience_id="experience-2",
+            job_title=None,
+            description="<ul><li>Managed payroll</li><li>Ran audits</li></ul>",
+          )
+        ],
+      ),
+    ],
+  )
+
+  ExplanationService(llm_client).generate_explanations(request)
+
+  assert len(llm_client.user_prompts) == 2
+
+  first_prompt, second_prompt = llm_client.user_prompts
+
+  assert "<p>" not in first_prompt and "<p>" not in second_prompt
+  assert "<li>" not in first_prompt and "<li>" not in second_prompt
+
+  assert "Java developer" in first_prompt
+  assert "Spring Boot" in first_prompt
+  assert "Senior Accountant" in first_prompt
+  assert "Prepared monthly reports." in first_prompt
+
+  assert "Java developer" in second_prompt
+  assert "Managed payroll" in second_prompt
+  assert "Ran audits" in second_prompt
 
 
 def test_generate_explanations_one_candidate_failure_does_not_fail_others(
