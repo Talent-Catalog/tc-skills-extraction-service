@@ -59,6 +59,19 @@ Return JSON only, without Markdown fences, matching this exact structure:
   ],
   "limitations": ["string"]
 }
+
+Field meanings:
+- "summary": A concise overall explanation of how the candidate's supplied
+  experience relates to the opportunity.
+- "experience_explanations": Exactly one entry for every supplied experience,
+  explaining how that experience relates to the opportunity. If an experience
+  has no apparent relevance to the opportunity, say so rather than omitting it.
+- "limitations": Gaps or uncertainties in the supplied candidate experience data
+  that limit the ability to assess the candidate against the opportunity.
+  Do not treat absence of evidence as evidence that the candidate lacks a skill,
+  qualification, or experience. Return an empty list if there are no material
+  limitations.
+
 Preserve the supplied candidate_id and experience_id values exactly.
 """.strip()
 
