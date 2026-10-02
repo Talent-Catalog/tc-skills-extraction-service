@@ -6,6 +6,12 @@ fastapi[standard]==0.139.0
 #(Note that fastapi[standard] includes uvicorn, pydantic, and other dependencies)
 
 spacy==3.8.14  # no Python 3.14 wheel at this pin (3.8.16 has one) - this project targets 3.12, see main.py
+
+# Strips HTML tags from input text before it reaches spaCy (skills_extractor.py,
+# text_preprocessor.py). Already installed transitively via docling, but pinned
+# directly here now that our own code imports it.
+beautifulsoup4==4.15.0
+
 pydantic==2.13.4
 pydantic-settings==2.14.2
 httpx==0.28.1

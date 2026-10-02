@@ -4,6 +4,7 @@ from typing import List
 import logging
 
 from app.models.skills_models import SkillName
+from app.services.html_utils import remove_html
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,11 @@ class SkillsExtractor:
 
   def extract_skills(self, text: str) -> List[SkillName]:
 
-    doc = self._nlp(text)
+    # Strip HTML tags before the text reaches spaCy, so markup like
+    # "<b>Python</b>" doesn't interfere with phrase matching.
+    text_without_html = remove_html(text)
+
+    doc = self._nlp(text_without_html)
 
     # Run matcher on the doc to find all the skills mentioned.
     skill_matches = []

@@ -110,6 +110,32 @@ def test_returns_empty_list_when_no_skills_match(extractor):
   assert result == []
 
 
+def test_strips_html_tags_before_matching(extractor):
+  result = extractor.extract_skills(
+    "<p>Skilled in <b>Python</b> and accounting.</p>"
+  )
+
+  assert result == [
+    SkillName(name="accounting", lang="en"),
+    SkillName(name="python", lang="en"),
+  ]
+
+
+def test_strips_html_tags_without_merging_adjacent_words(extractor):
+  """
+  Adjacent tags with no whitespace between them must not merge the words
+  either side of the boundary into one unmatched token.
+  """
+  result = extractor.extract_skills(
+    "<li>Python</li><li>accounting</li>"
+  )
+
+  assert result == [
+    SkillName(name="accounting", lang="en"),
+    SkillName(name="python", lang="en"),
+  ]
+
+
 def test_related_word_does_not_currently_match(extractor):
   """
   Documents the current limitation: PhraseMatcher performs phrase matching,
