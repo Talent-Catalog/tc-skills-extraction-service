@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 import json
 import logging
 from typing import cast
@@ -38,10 +39,11 @@ class FakeLlmClient(LlmClient):
         completion_tokens=22,
         total_tokens=33,
       ),
+      model_name: str = "test-model",
   ) -> None:
     super().__init__(
       base_url="http://llm.test/v1",
-      model_name="test-model",
+      model_name=model_name,
       timeout=1.0,
       http_client=cast(
         httpx.Client,
@@ -50,13 +52,18 @@ class FakeLlmClient(LlmClient):
     )
     self.content = content
     self.usage = usage
+    self.model_name = model_name
     self.system_prompt: str | None = None
     self.user_prompt: str | None = None
 
   def generate(self, system_prompt: str, user_prompt: str) -> LlmResult:
     self.system_prompt = system_prompt
     self.user_prompt = user_prompt
-    return LlmResult(content=self.content, usage=self.usage)
+    return LlmResult(
+      content=self.content,
+      usage=self.usage,
+      model_name=self.model_name,
+    )
 
 
 VALID_GENERATED_CONTENT = """{
@@ -315,10 +322,12 @@ def test_generate_explanations_returns_a_result_per_candidate_in_order(
 ) -> None:
   llm_client = ScriptedLlmClient([
     LlmResult(
+      model_name="test-model",
       content=_valid_content("candidate-1", "experience-1"),
       usage=LlmUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
     ),
     LlmResult(
+      model_name="test-model",
       content=_valid_content("candidate-2", "experience-2"),
       usage=LlmUsage(prompt_tokens=3, completion_tokens=3, total_tokens=6),
     ),
@@ -358,10 +367,12 @@ def test_generate_explanations_strips_html_for_every_candidate() -> None:
   """
   llm_client = ScriptedLlmClient([
     LlmResult(
+      model_name="test-model",
       content=_valid_content("candidate-1", "experience-1"),
       usage=LlmUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
     ),
     LlmResult(
+      model_name="test-model",
       content=_valid_content("candidate-2", "experience-2"),
       usage=LlmUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
     ),
@@ -421,11 +432,13 @@ def test_generate_explanations_one_candidate_failure_does_not_fail_others(
   """
   llm_client = ScriptedLlmClient([
     LlmResult(
+      model_name="test-model",
       content=_valid_content("candidate-1", "experience-1"),
       usage=LlmUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
     ),
     LlmServiceUnavailableError("The LLM service is unavailable"),
     LlmResult(
+      model_name="test-model",
       content=_valid_content("candidate-3", "experience-3"),
       usage=LlmUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
     ),
@@ -470,6 +483,7 @@ def test_generate_explanations_invalid_llm_output_is_an_item_level_error(
   """
   llm_client = ScriptedLlmClient([
     LlmResult(
+      model_name="test-model",
       content="not JSON",
       usage=LlmUsage(prompt_tokens=5, completion_tokens=5, total_tokens=10),
     ),
@@ -493,10 +507,12 @@ def test_generate_explanations_logs_token_usage_for_every_candidate(
 ) -> None:
   llm_client = ScriptedLlmClient([
     LlmResult(
+      model_name="test-model",
       content=_valid_content("candidate-1", "experience-1"),
       usage=LlmUsage(prompt_tokens=101, completion_tokens=201, total_tokens=302),
     ),
     LlmResult(
+      model_name="test-model",
       content=_valid_content("candidate-2", "experience-2"),
       usage=LlmUsage(prompt_tokens=103, completion_tokens=203, total_tokens=306),
     ),
@@ -557,3 +573,216 @@ def test_generated_experience_ids_must_match_request(
     ExplanationService(
       FakeLlmClient(content)
     ).generate_explanation(explanation_request)
+
+
+FIXED_GENERATED_AT = datetime(2026, 10, 2, 3, 30, tzinfo=UTC)
+
+
+def test_response_reports_generated_at_from_the_clock(
+    explanation_request: ExplanationRequest,
+) -> None:
+  response = ExplanationService(
+    FakeLlmClient(VALID_GENERATED_CONTENT),
+    clock=lambda: FIXED_GENERATED_AT,
+  ).generate_explanation(explanation_request)
+
+  assert response.generated_at == FIXED_GENERATED_AT
+
+
+def test_default_generated_at_is_utc_and_falls_within_the_call(
+    explanation_request: ExplanationRequest,
+) -> None:
+  before = datetime.now(UTC)
+  response = ExplanationService(
+    FakeLlmClient(VALID_GENERATED_CONTENT)
+  ).generate_explanation(explanation_request)
+  after = datetime.now(UTC)
+
+  assert response.generated_at.utcoffset() == timedelta(0)
+  assert before <= response.generated_at <= after
+
+
+def test_generated_at_serializes_as_utc(
+    explanation_request: ExplanationRequest,
+) -> None:
+  response = ExplanationService(
+    FakeLlmClient(VALID_GENERATED_CONTENT),
+    clock=lambda: FIXED_GENERATED_AT,
+  ).generate_explanation(explanation_request)
+
+  assert response.model_dump(mode="json")["generated_at"] == (
+    "2026-10-02T03:30:00Z"
+  )
+
+
+def test_naive_generated_at_is_rejected(
+    explanation_request: ExplanationRequest,
+) -> None:
+  with pytest.raises(ValueError):
+    ExplanationService(
+      FakeLlmClient(VALID_GENERATED_CONTENT),
+      clock=lambda: datetime(2026, 10, 2, 3, 30),
+    ).generate_explanation(explanation_request)
+
+
+def test_response_reports_the_configured_model_name(
+    explanation_request: ExplanationRequest,
+) -> None:
+  response = ExplanationService(
+    FakeLlmClient(
+      VALID_GENERATED_CONTENT,
+      model_name="some-other-configured-model",
+    )
+  ).generate_explanation(explanation_request)
+
+  assert response.model_name == "some-other-configured-model"
+
+
+def test_job_titles_are_copied_from_input_by_experience_id() -> None:
+  """
+  The LLM returns explanations in a different order from the input, and its
+  JSON contains no job titles - each job title must still come from the
+  input experience with the same ID.
+  """
+  request = ExplanationRequest(
+    candidate_id="candidate-1",
+    opportunity_description="Seeking an accountant.",
+    experiences=[
+      CandidateExperience(
+        experience_id="experience-1",
+        job_title="Accountant",
+        description="Prepared monthly financial reports.",
+      ),
+      CandidateExperience(
+        experience_id="experience-2",
+        job_title="Payroll Officer",
+        description="Ran fortnightly payroll.",
+      ),
+      CandidateExperience(
+        experience_id="experience-3",
+        job_title=None,
+        description="Volunteered at a food bank.",
+      ),
+    ],
+  )
+  content = json.dumps({
+    "candidate_id": "candidate-1",
+    "summary": "Summary",
+    "experience_explanations": [
+      {"experience_id": "experience-3", "explanation": "Third."},
+      {"experience_id": "experience-1", "explanation": "First."},
+      {"experience_id": "experience-2", "explanation": "Second."},
+    ],
+    "limitations": [],
+  })
+
+  response = ExplanationService(
+    FakeLlmClient(content)
+  ).generate_explanation(request)
+
+  assert [
+    (e.experience_id, e.job_title, e.explanation)
+    for e in response.experience_explanations
+  ] == [
+    ("experience-3", None, "Third."),
+    ("experience-1", "Accountant", "First."),
+    ("experience-2", "Payroll Officer", "Second."),
+  ]
+
+
+def test_job_title_generated_by_the_llm_is_ignored(
+    explanation_request: ExplanationRequest,
+) -> None:
+  content = json.dumps({
+    "candidate_id": "candidate-1",
+    "summary": "Summary",
+    "experience_explanations": [
+      {
+        "experience_id": "experience-1",
+        "job_title": "Chief Financial Officer",
+        "explanation": "Explanation",
+      },
+    ],
+    "limitations": [],
+  })
+
+  response = ExplanationService(
+    FakeLlmClient(content)
+  ).generate_explanation(explanation_request)
+
+  assert response.experience_explanations[0].job_title == "Accountant"
+
+
+def test_llm_output_schema_in_prompt_excludes_application_fields() -> None:
+  """Application-supplied fields must not be requested from the LLM."""
+  prompt = ExplanationService.SYSTEM_PROMPT
+
+  assert "job_title" not in prompt
+  assert "generated_at" not in prompt
+  assert "model_name" not in prompt
+
+
+@pytest.mark.parametrize(
+  "generated_experience_ids",
+  [
+    [],
+    ["experience-1", "experience-1"],
+    ["experience-1", "experience-2"],
+  ],
+  ids=["missing", "duplicate", "unexpected"],
+)
+def test_generated_experience_ids_must_match_exactly(
+    explanation_request: ExplanationRequest,
+    generated_experience_ids: list[str],
+) -> None:
+  content = json.dumps({
+    "candidate_id": "candidate-1",
+    "summary": "Summary",
+    "experience_explanations": [
+      {"experience_id": experience_id, "explanation": "Explanation"}
+      for experience_id in generated_experience_ids
+    ],
+    "limitations": [],
+  })
+
+  with pytest.raises(
+      ExplanationGenerationError,
+      match="IDs that do not match",
+  ):
+    ExplanationService(
+      FakeLlmClient(content)
+    ).generate_explanation(explanation_request)
+
+
+def test_generate_explanations_results_carry_generation_metadata() -> None:
+  llm_client = ScriptedLlmClient([
+    LlmResult(
+      model_name="test-model",
+      content=_valid_content("candidate-1", "experience-1"),
+      usage=LlmUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+    ),
+    LlmServiceUnavailableError("The LLM service is unavailable"),
+  ])
+
+  request = ExplanationsRequest(
+    opportunity_description="Seeking an accountant.",
+    candidates=[
+      _batch_candidate("candidate-1", "experience-1"),
+      _batch_candidate("candidate-2", "experience-2"),
+    ],
+  )
+
+  response = ExplanationService(
+    llm_client,
+    clock=lambda: FIXED_GENERATED_AT,
+  ).generate_explanations(request)
+
+  succeeded, failed = response.results
+
+  assert succeeded.generated_at == FIXED_GENERATED_AT
+  assert succeeded.model_name == "test-model"
+  assert succeeded.experience_explanations[0].job_title == "Accountant"
+
+  assert failed.error is not None
+  assert failed.generated_at is None
+  assert failed.model_name is None

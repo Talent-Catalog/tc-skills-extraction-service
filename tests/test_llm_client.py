@@ -156,6 +156,7 @@ def test_extracts_assistant_message_content(
   ).generate("system", "evidence")
 
   assert result.content == "generated content"
+  assert result.model_name == "configured-model"
 
 
 def test_parses_reported_token_usage(

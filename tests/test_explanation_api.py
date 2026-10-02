@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import httpx
 from fastapi.testclient import TestClient
 
@@ -81,10 +83,13 @@ def test_post_explanations_returns_results_for_multiple_candidates() -> None:
     results=[
       CandidateExplanationResult(
         candidate_id="candidate-1",
+        generated_at=datetime(2026, 10, 2, 3, 30, tzinfo=UTC),
+        model_name="test-model",
         summary="Relevant supplied experience.",
         experience_explanations=[
           ExperienceExplanation(
             experience_id="experience-1",
+            job_title="Accountant",
             explanation="The description mentions financial reporting.",
           )
         ],
@@ -126,7 +131,14 @@ def test_post_explanations_returns_results_for_multiple_candidates() -> None:
   )
 
   assert response.status_code == 200
-  assert response.json() == result.model_dump()
+  body = response.json()
+  assert body == result.model_dump(mode="json")
+  assert body["results"][0]["generated_at"] == "2026-10-02T03:30:00Z"
+  assert body["results"][0]["model_name"] == "test-model"
+  assert (
+    body["results"][0]["experience_explanations"][0]["job_title"]
+    == "Accountant"
+  )
 
 
 def test_post_explanations_preserves_item_level_failure() -> None:
@@ -141,10 +153,13 @@ def test_post_explanations_preserves_item_level_failure() -> None:
     results=[
       CandidateExplanationResult(
         candidate_id="candidate-1",
+        generated_at=datetime(2026, 10, 2, 3, 30, tzinfo=UTC),
+        model_name="test-model",
         summary="Relevant supplied experience.",
         experience_explanations=[
           ExperienceExplanation(
             experience_id="experience-1",
+            job_title="Accountant",
             explanation="The description mentions financial reporting.",
           )
         ],
@@ -164,7 +179,9 @@ def test_post_explanations_preserves_item_level_failure() -> None:
 
   assert response.status_code == 200
   body = response.json()
-  assert body == result.model_dump()
+  assert body == result.model_dump(mode="json")
+  assert body["results"][1]["generated_at"] is None
+  assert body["results"][1]["model_name"] is None
   assert body["results"][1]["candidate_id"] == "candidate-2"
   assert body["results"][1]["error"]["code"] == "LLM_SERVICE_UNAVAILABLE"
 
