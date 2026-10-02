@@ -18,6 +18,13 @@ httpx==0.28.1
 pytest
 numpy==2.5.1
 
+# botocore is used directly by app/services/llm_client.py: it discovers AWS
+# credentials via the standard provider chain (e.g. the ECS task role) and
+# signs Bedrock requests with AWS Signature Version 4 when
+# LLM_AUTHENTICATION=AWS_SIGV4. We only use its credential/signing pieces,
+# not the boto3 Bedrock inference API - see llm_client.py.
+botocore==1.43.103
+
 # Added for POST /extract_candidate_occupations (app/services/cv_extraction/):
 python-multipart==0.0.32  # FastAPI UploadFile/File(...) form uploads
 pyyaml==6.0.3             # reads the vendored schema YAML in cv_extraction/schemas/

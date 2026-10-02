@@ -6,22 +6,27 @@ from fastapi.testclient import TestClient
 from app.dependencies import get_explanation_service
 from app.main import app
 from app.models.explanation_models import (
+  CandidateExplanationResult,
   ExperienceExplanation,
-  ExplanationRequest,
-  ExplanationResponse,
+  ExplanationError,
+  ExplanationErrorCode,
+  ExplanationsRequest,
+  ExplanationsResponse,
 )
-from app.services.explanation_service import ExplanationGenerationError
-from app.services.llm_client import LlmServiceUnavailableError
 
 
 VALID_REQUEST = {
-  "candidate_id": "candidate-1",
   "opportunity_description": "Seeking an accountant.",
-  "experiences": [
+  "candidates": [
     {
-      "experience_id": "experience-1",
-      "job_title": "Accountant",
-      "description": "Prepared financial reports.",
+      "candidate_id": "candidate-1",
+      "experiences": [
+        {
+          "experience_id": "experience-1",
+          "job_title": "Accountant",
+          "description": "Prepared financial reports.",
+        }
+      ],
     }
   ],
 }
@@ -32,16 +37,16 @@ class FakeExplanationService:
 
   def __init__(
       self,
-      result: ExplanationResponse | None = None,
+      result: ExplanationsResponse | None = None,
       error: Exception | None = None,
   ) -> None:
     self._result = result
     self._error = error
 
-  def generate_explanation(
+  def generate_explanations(
       self,
-      request: ExplanationRequest,
-  ) -> ExplanationResponse:
+      request: ExplanationsRequest,
+  ) -> ExplanationsResponse:
     if self._error is not None:
       raise self._error
 
@@ -53,53 +58,149 @@ class FakeExplanationService:
 
 def post_with_service(
     service: FakeExplanationService,
+    payload: dict | None = None,
 ) -> httpx.Response:
   """Call the endpoint with its singleton dependency replaced by a fake."""
   app.dependency_overrides[get_explanation_service] = lambda: service
   client = TestClient(app, raise_server_exceptions=False)
   try:
-    return client.post("/explanations", json=VALID_REQUEST)
+    return client.post(
+      "/explanations",
+      json=payload if payload is not None else VALID_REQUEST,
+    )
   finally:
     client.close()
     app.dependency_overrides.clear()
 
 
-def test_post_explanations_returns_generated_explanation() -> None:
-  response_model = ExplanationResponse(
-    candidate_id="candidate-1",
-    summary="Relevant supplied experience.",
-    experience_explanations=[
-      ExperienceExplanation(
-        experience_id="experience-1",
-        explanation="The description mentions financial reporting.",
-      )
+def test_post_explanations_returns_results_for_multiple_candidates() -> None:
+  result = ExplanationsResponse(
+    requested=2,
+    succeeded=2,
+    failed=0,
+    results=[
+      CandidateExplanationResult(
+        candidate_id="candidate-1",
+        summary="Relevant supplied experience.",
+        experience_explanations=[
+          ExperienceExplanation(
+            experience_id="experience-1",
+            explanation="The description mentions financial reporting.",
+          )
+        ],
+        limitations=[],
+      ),
+      CandidateExplanationResult(
+        candidate_id="candidate-2",
+        summary="Also relevant supplied experience.",
+        experience_explanations=[
+          ExperienceExplanation(
+            experience_id="experience-2",
+            explanation="The description mentions bookkeeping.",
+          )
+        ],
+        limitations=[],
+      ),
     ],
-    limitations=["The supplied text does not address every requirement."],
   )
 
-  response = post_with_service(FakeExplanationService(response_model))
+  response = post_with_service(
+    FakeExplanationService(result),
+    payload={
+      "opportunity_description": "Seeking an accountant.",
+      "candidates": [
+        {
+          "candidate_id": "candidate-1",
+          "experiences": [
+            {"experience_id": "experience-1", "description": "..."}
+          ],
+        },
+        {
+          "candidate_id": "candidate-2",
+          "experiences": [
+            {"experience_id": "experience-2", "description": "..."}
+          ],
+        },
+      ],
+    },
+  )
 
   assert response.status_code == 200
-  assert response.json() == response_model.model_dump()
+  assert response.json() == result.model_dump()
 
 
-def test_post_explanations_maps_unavailable_llm_to_503() -> None:
-  response = post_with_service(
-    FakeExplanationService(
-      error=LlmServiceUnavailableError("LLM unavailable")
-    )
+def test_post_explanations_preserves_item_level_failure() -> None:
+  """
+  An HTTP 200 response can contain both successful and failed candidate
+  results, mirroring the embeddings API's approach to item failures.
+  """
+  result = ExplanationsResponse(
+    requested=2,
+    succeeded=1,
+    failed=1,
+    results=[
+      CandidateExplanationResult(
+        candidate_id="candidate-1",
+        summary="Relevant supplied experience.",
+        experience_explanations=[
+          ExperienceExplanation(
+            experience_id="experience-1",
+            explanation="The description mentions financial reporting.",
+          )
+        ],
+        limitations=[],
+      ),
+      CandidateExplanationResult(
+        candidate_id="candidate-2",
+        error=ExplanationError(
+          code=ExplanationErrorCode.LLM_SERVICE_UNAVAILABLE,
+          message="The LLM service is unavailable",
+        ),
+      ),
+    ],
   )
 
-  assert response.status_code == 503
-  assert response.json() == {"detail": "LLM unavailable"}
+  response = post_with_service(FakeExplanationService(result))
+
+  assert response.status_code == 200
+  body = response.json()
+  assert body == result.model_dump()
+  assert body["results"][1]["candidate_id"] == "candidate-2"
+  assert body["results"][1]["error"]["code"] == "LLM_SERVICE_UNAVAILABLE"
 
 
-def test_post_explanations_maps_invalid_output_to_502() -> None:
+def test_post_explanations_rejects_empty_candidate_list() -> None:
   response = post_with_service(
-    FakeExplanationService(
-      error=ExplanationGenerationError("Invalid model output")
-    )
+    FakeExplanationService(),
+    payload={
+      "opportunity_description": "Seeking an accountant.",
+      "candidates": [],
+    },
   )
 
-  assert response.status_code == 502
-  assert response.json() == {"detail": "Invalid model output"}
+  assert response.status_code == 422
+
+
+def test_post_explanations_rejects_duplicate_candidate_ids() -> None:
+  response = post_with_service(
+    FakeExplanationService(),
+    payload={
+      "opportunity_description": "Seeking an accountant.",
+      "candidates": [
+        {
+          "candidate_id": "candidate-1",
+          "experiences": [
+            {"experience_id": "experience-1", "description": "..."}
+          ],
+        },
+        {
+          "candidate_id": "candidate-1",
+          "experiences": [
+            {"experience_id": "experience-2", "description": "..."}
+          ],
+        },
+      ],
+    },
+  )
+
+  assert response.status_code == 422
