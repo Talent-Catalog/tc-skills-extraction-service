@@ -72,10 +72,14 @@ class LlmUsage:
 
 @dataclass(frozen=True)
 class LlmResult:
-  """One generated chat completion and the token usage it reported."""
+  """
+  One generated chat completion, the token usage it reported, and the
+  configured model name the request was sent with.
+  """
 
   content: str
   usage: LlmUsage
+  model_name: str
 
 
 class LlmClient:
@@ -195,6 +199,7 @@ class LlmClient:
     return LlmResult(
       content=content,
       usage=self._parse_usage(payload),
+      model_name=self._model_name,
     )
 
   @classmethod
