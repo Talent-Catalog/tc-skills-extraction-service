@@ -48,6 +48,17 @@ module "ecs_service" {
   create_task_exec_policy   = true
   task_exec_ssm_param_arns  = [aws_ssm_parameter.skills_base_url.arn]
 
+  # Task role - allow the application to invoke the configured Bedrock LLM.
+  # Bedrock authentication uses this task role through the standard AWS credential provider
+  # chain (LLM_AUTHENTICATION=AWS_SIGV4). No static AWS credentials or Bedrock API key are needed.
+  tasks_iam_role_statements = {
+    bedrock = {
+      sid       = "BedrockInvokeModel"
+      actions   = ["bedrock:InvokeModel"]
+      resources = ["arn:aws:bedrock:${local.region}::foundation-model/*"]
+    }
+  }
+
   # Container definition(s)
   container_definitions = {
 
