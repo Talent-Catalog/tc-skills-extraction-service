@@ -11,6 +11,12 @@ provider "aws" {
   }
 }
 
+# SNS topic for CloudWatch alarm notifications (TC-1526).
+# Owned by the talentcatalog opc-prod root; must already exist before this root is planned.
+data "aws_sns_topic" "alarms" {
+  name = "opc-prod-alarms"
+}
+
 # tc-skills-extraction infrastructure for OPC AWS production account
 module "tc-opc-prod" {
   source = "./.."
@@ -30,6 +36,10 @@ module "tc-opc-prod" {
 
   # SSM-backed (stored in SSM, injected into ECS task)
   tc_skills_base_url  = "https://plus.tctalent.org/api/public/skill/names"
+
+  # CloudWatch alarm coverage (TC-1526)
+  cloudwatch_alarms_enabled = true
+  alarm_sns_topic_arn       = data.aws_sns_topic.alarms.arn
 }
 
 # Configure the opc-production terraform workspace
