@@ -8,6 +8,7 @@ from spacy.language import Language
 from spacy.tokens import Doc, Token
 
 from app.models.embedding_models import EmbeddingConfigurationVersion
+from app.services.html_utils import remove_html
 
 
 class SpacyTextPreprocessor:
@@ -65,6 +66,7 @@ class SpacyTextPreprocessor:
     Apply conservative basic cleanup.
 
     V1:
+    - strips HTML tags;
     - decodes HTML entities;
     - applies Unicode normalization;
     - replaces repeated whitespace with a single space;
@@ -104,7 +106,7 @@ class SpacyTextPreprocessor:
     - includes all V1 cleanup;
     - converts words to their dictionary base form;
     - removes punctuation;
-    - removes stop words;
+    - removes stop words (the, a, for, was, etc)
     - preserves important negation words.
     """
     cleaned_text = self._basic_cleanup(text)
@@ -126,8 +128,11 @@ class SpacyTextPreprocessor:
     if not text or not text.strip():
       raise ValueError("Text must not be empty")
 
+    # Strip HTML tags before any spaCy processing.
+    text_without_html = remove_html(text)
+
     # Convert values such as '&amp;' into '&'.
-    decoded_text = unescape(text)
+    decoded_text = unescape(text_without_html)
 
     # Normalize equivalent Unicode representations.
     normalized_text = unicodedata.normalize(

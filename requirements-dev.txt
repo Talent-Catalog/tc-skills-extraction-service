@@ -31,6 +31,10 @@ httpx==0.28.1
 pytest
 numpy==2.5.1
 
+# botocore is used directly by app/services/llm_client.py - see
+# requirements.txt for the full explanation.
+botocore==1.43.103
+
 # Added for POST /extract_candidate_occupations (app/services/cv_extraction/):
 python-multipart==0.0.32  # FastAPI UploadFile/File(...) form uploads
 pyyaml==6.0.3             # reads the vendored schema YAML in cv_extraction/schemas/

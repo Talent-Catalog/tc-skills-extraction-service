@@ -77,18 +77,32 @@ POST http://localhost:8000/explanations
 Content-Type: application/json
 
 {
-  "candidate_id": "cand-123",
   "opportunity_description": "Looking for a backend engineer with strong Python and AWS experience, plus experience mentoring junior devs.",
-  "experiences": [
+  "candidates": [
     {
-      "experience_id": "exp-1",
-      "job_title": "Senior Software Engineer",
-      "description": "Built and maintained Python microservices on AWS (Lambda, ECS). Mentored two junior engineers."
+      "candidate_id": "cand-123",
+      "experiences": [
+        {
+          "experience_id": "exp-1",
+          "job_title": "Senior Software Engineer",
+          "description": "Built and maintained Python microservices on AWS (Lambda, ECS). Mentored two junior engineers."
+        },
+        {
+          "experience_id": "exp-2",
+          "job_title": "Data Analyst",
+          "description": "Wrote SQL reports and Excel dashboards for sales team."
+        }
+      ]
     },
     {
-      "experience_id": "exp-2",
-      "job_title": "Data Analyst",
-      "description": "Wrote SQL reports and Excel dashboards for sales team."
+      "candidate_id": "cand-456",
+      "experiences": [
+        {
+          "experience_id": "exp-3",
+          "job_title": "Junior Developer",
+          "description": "Wrote unit tests and fixed bugs in a Java Spring Boot application."
+        }
+      ]
     }
   ]
 }

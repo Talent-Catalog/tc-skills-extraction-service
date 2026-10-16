@@ -97,15 +97,23 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
 
   # noinspection PyArgumentList
   settings = Settings()
-  # Qwen runs behind a separate OpenAI-compatible inference server so model
-  # resources are not loaded into this FastAPI process.
+  # LLM inference is provided by a separately hosted OpenAI-compatible
+  # service, so model resources are not loaded into this FastAPI process.
+  # llm_base_url is None by default, meaning "use the default Amazon Bedrock
+  # OpenAI-compatible endpoint for llm_aws_region" - resolved here, not
+  # inside LlmClient, which stays provider-independent.
+  llm_base_url = settings.llm_base_url or (
+    f"https://bedrock-runtime.{settings.llm_aws_region}.amazonaws.com/openai/v1"
+  )
   llm_http_client = httpx.Client()
   llm_client = LlmClient(
-    base_url=settings.llm_base_url,
+    base_url=llm_base_url,
     model_name=settings.llm_model_name,
     timeout=settings.llm_request_timeout_seconds,
     http_client=llm_http_client,
+    authentication=settings.llm_authentication,
     api_key=settings.llm_api_key,
+    llm_aws_region=settings.llm_aws_region,
   )
   explanation_service = ExplanationService(llm_client)
 
